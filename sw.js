@@ -6,14 +6,10 @@
 
 /* Bump this to ship an update: it renames both caches, and the old ones are
    deleted on activate. */
-var VERSION = 'v1';
+var VERSION = 'v3';
 var SHELL_CACHE = 'ssp-shell-' + VERSION;
 var DATA_CACHE = 'ssp-data-' + VERSION;
 
-/* assets/logo.svg is deliberately absent from this list. It is supplied
-   separately and may not exist; cache.addAll() rejects the whole batch if any
-   single request 404s, which would silently leave the app with no offline
-   support at all. It is cached opportunistically below instead. */
 var SHELL = [
   '.',
   'index.html',
@@ -23,11 +19,10 @@ var SHELL = [
   'icon-192.png',
   'icon-512.png',
   'apple-touch-icon.png',
+  'assets/logo/Sekolah%20Siaga%20Panas%20LOGO.png',
   'assets/fonts/archivo-narrow-latin.woff2',
   'assets/fonts/archivo-narrow-latin-ext.woff2'
 ];
-
-var OPTIONAL = ['assets/logo.svg'];
 
 /* Hosts whose GET responses are worth keeping as an offline fallback. */
 var DATA_HOSTS = ['bmkg-restapi.vercel.app', 'api.open-meteo.com'];
@@ -35,12 +30,7 @@ var DATA_HOSTS = ['bmkg-restapi.vercel.app', 'api.open-meteo.com'];
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(SHELL_CACHE).then(function (cache) {
-      return cache.addAll(SHELL).then(function () {
-        // Best-effort, never fatal.
-        return Promise.all(OPTIONAL.map(function (u) {
-          return cache.add(u).catch(function () { /* not supplied yet */ });
-        }));
-      });
+      return cache.addAll(SHELL);
     }).then(function () { return self.skipWaiting(); })
   );
 });

@@ -298,12 +298,10 @@
   /**
    * BMKG via the community wrapper.
    *
-   * Only the 3-day forecast endpoint is called, not /current as well. The
-   * forecast payload already carries the location block (including lat/lon) and
-   * its first remaining entry is the same entry /current returns — verified
-   * against the live API. With a 30 req/min limit shared across every user of
-   * the deployment, spending two requests to obtain one extra copy of data we
-   * already hold would be careless. See README.md.
+   * The 3-day forecast endpoint is the only endpoint used during normal loads.
+   * Setup calls /current once to capture coordinates for the fallback source;
+   * subsequent refreshes do not spend a second request on the same current
+   * slot. See README.md.
    *
    * Entries are 3-HOURLY, not hourly, and BMKG drops entries whose time has
    * already passed, so "today" shrinks as the day goes on.
@@ -319,17 +317,22 @@
       var entries = [];
       for (var i = 0; i < d.forecast.length; i++) {
         var day = d.forecast[i];
-        if (!day || !Array.isArray(day.entries)) continue;
+        if (!day || !Array.isArray(day.entries)) throw new AppError('MALFORMED');
         for (var j = 0; j < day.entries.length; j++) {
           var e = day.entries[j];
-          if (!e) continue;
+          if (!e) throw new AppError('MALFORMED');
           var t = e.temperature_c, rh = e.humidity_pct;
-          if (!isNum(t, -50, 60) || !isNum(rh, 0, 100)) continue;
+          if (!isNum(t, -50, 60) || !isNum(rh, 0, 100)) {
+            throw new AppError('MALFORMED');
+          }
 
           var at = parseUtcStamp(e.utc_datetime);
           var lm = /^(\d{4}-\d{2}-\d{2})[ T](\d{2})/.exec(String(e.local_datetime || ''));
+          if (!lm || !isFinite(parseUtcStamp(e.local_datetime))) {
+            throw new AppError('MALFORMED');
+          }
           if (!isFinite(at) && lm) at = parseUtcStamp(e.local_datetime) - offset * 60000;
-          if (!isFinite(at)) continue;
+          if (!isFinite(at)) throw new AppError('MALFORMED');
 
           entries.push({
             at: at,
@@ -354,6 +357,24 @@
   };
 
   /**
+   * One-time setup lookup. The current endpoint is used only to capture the
+   * confirmed village's coordinates for Open-Meteo; all displayed values still
+   * come from the forecast endpoint so the headline can represent the daily
+   * peak rather than a single instant.
+   */
+  sources.bmkgCurrentCoords = function (adm4) {
+    return fetchJSON(CFG.BMKG + '/v1/weather/' + encodeURIComponent(adm4) + '/current')
+      .then(function (r) {
+        var loc = r.json && r.json.data && r.json.data.location;
+        var lat = loc && loc.lat, lon = loc && loc.lon;
+        if (!isNum(lat, -90, 90) || !isNum(lon, -180, 180)) {
+          throw new AppError('MALFORMED');
+        }
+        return { lat: lat, lon: lon };
+      });
+  };
+
+  /**
    * Open-Meteo. Global, no key, guaranteed CORS. True hourly, and it includes
    * hours already past today — a fuller picture than BMKG gives, which is why
    * the hour strip changes resolution when this source is in use.
@@ -370,6 +391,10 @@
       var d = r.json, hh = d && d.hourly;
       if (!hh || !Array.isArray(hh.time) || !Array.isArray(hh.temperature_2m) ||
           !Array.isArray(hh.relative_humidity_2m)) throw new AppError('MALFORMED');
+      if (hh.time.length !== hh.temperature_2m.length ||
+          hh.time.length !== hh.relative_humidity_2m.length) {
+        throw new AppError('MALFORMED');
+      }
 
       var offsetSec = typeof d.utc_offset_seconds === 'number' ? d.utc_offset_seconds : 7 * 3600;
       var offset = Math.round(offsetSec / 60);
@@ -377,9 +402,11 @@
       var entries = [];
       for (var i = 0; i < hh.time.length; i++) {
         var t = hh.temperature_2m[i], rh = hh.relative_humidity_2m[i];
-        if (!isNum(t, -50, 60) || !isNum(rh, 0, 100)) continue;
+        if (!isNum(t, -50, 60) || !isNum(rh, 0, 100)) {
+          throw new AppError('MALFORMED');
+        }
         var m = /^(\d{4}-\d{2}-\d{2})T(\d{2})/.exec(String(hh.time[i] || ''));
-        if (!m) continue;
+        if (!m || !isFinite(parseUtcStamp(hh.time[i]))) throw new AppError('MALFORMED');
         entries.push({
           at: parseUtcStamp(hh.time[i]) - offsetSec * 1000,
           dayKey: m[1],
@@ -445,6 +472,15 @@
       });
     }).then(function (reading) {
       reading.adm4 = loc.adm4;
+      // A location first saved during an outage has no coordinates. As soon as
+      // BMKG later responds, repair the saved location so future Open-Meteo
+      // fallback attempts can succeed.
+      if (reading.source === 'bmkg' && reading.coords &&
+          (!isNum(loc.lat, -90, 90) || !isNum(loc.lon, -180, 180))) {
+        loc.lat = reading.coords.lat;
+        loc.lon = reading.coords.lon;
+        store.set(CFG.KEY_LOC, loc);
+      }
       // A body replayed from the service worker's cache is not a fresh reading.
       if (reading.fromCache && cachedFor) return useCache('OFFLINE');
       store.set(CFG.KEY_READING, reading);
@@ -525,6 +561,8 @@
       var n = $(id);
       if (n) n.hidden = (id !== which);
     });
+    var skip = document.querySelector('.skip-link');
+    if (skip) skip.setAttribute('href', '#' + which);
     window.scrollTo(0, 0);
   }
 
@@ -754,15 +792,11 @@
       savedAt: Date.now()
     };
 
-    sources.bmkg(loc).then(function (reading) {
-      if (reading.coords && (loc.lat == null || loc.lon == null)) {
-        loc.lat = reading.coords.lat;
-        loc.lon = reading.coords.lon;
-      }
+    sources.bmkgCurrentCoords(adm4).then(function (foundCoords) {
+      loc.lat = foundCoords.lat;
+      loc.lon = foundCoords.lon;
       store.set(CFG.KEY_LOC, loc);
-      reading.adm4 = adm4;
-      store.set(CFG.KEY_READING, reading);
-      renderReading(loc, { reading: reading, stale: false, problem: null });
+      boot();
     }, function (e) {
       // Saving anyway is the right call: the school's location is a fact, and
       // a transient outage should not force the user through setup again.
@@ -1022,7 +1056,7 @@
       area.appendChild(msgBox('banner--info', reading.degradedFrom,
         'Beralih otomatis ke sumber cadangan Open-Meteo.'));
     }
-    if (loc.lat == null && !isStale) {
+    if ((!isNum(loc.lat, -90, 90) || !isNum(loc.lon, -180, 180)) && !isStale) {
       area.appendChild(msgBox('banner--info', 'NO_COORDS'));
     }
   }
@@ -1149,6 +1183,7 @@
     var logo = $('logo');
     function logoFallback() {
       if (!logo || !logo.parentNode) return;
+      logo.parentNode.classList.add('lockup--fallback');
       var ph = document.createElement('span');
       ph.className = 'lockup__mark';
       ph.setAttribute('aria-hidden', 'true');
@@ -1196,8 +1231,7 @@
     try {
       showScreen('screen-fatal');
       $('fatal-msg').textContent =
-        'Terjadi kesalahan tak terduga. Coba muat ulang halaman. ' +
-        (detail ? '(' + String(detail).slice(0, 120) + ')' : '');
+        'Terjadi kesalahan tak terduga. Coba muat ulang halaman.';
     } catch (_) { /* nothing left to do */ }
   }
 

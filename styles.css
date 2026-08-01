@@ -55,6 +55,12 @@
   --keyline: var(--ink);
   --muted-fg: var(--muted);
 
+  /* Edge around anything whose FILL is a level colour. It cannot simply be
+     "black": a HITAM block is black, and on a dark page a black block with a
+     black keyline loses its edges entirely — worst on the most severe level.
+     This token keeps every block's boundary visible against either theme. */
+  --edge: var(--ink);
+
   --rule: 3px;      /* thick black keyline */
   --radius: 4px;    /* one small consistent radius, nothing softer */
   --gap: 12px;
@@ -73,6 +79,7 @@
     --panel: #1C1C14;
     --keyline: #4A4A3E;
     --muted-fg: #A3A399;
+    --edge: #8A8A80;
   }
 }
 
@@ -132,11 +139,22 @@ body {
 .lockup {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
   padding: 12px 2px 10px;
 }
+.lockup__brand {
+  display: block;
+  width: min(100%, 320px);
+  height: auto;
+  padding: 7px 8px;
+  border-radius: var(--radius);
+  background: #FDFBEA;
+}
 .lockup__mark { width: 40px; height: 40px; display: block; flex: 0 0 auto; }
-.lockup__text { display: flex; flex-direction: column; min-width: 0; }
+.lockup__text { display: none; flex-direction: column; min-width: 0; }
+.lockup--fallback { justify-content: flex-start; }
+.lockup--fallback .lockup__text { display: flex; }
 .lockup__name {
   font-weight: 700;
   text-transform: uppercase;
@@ -157,7 +175,7 @@ body {
 /* ------------------------------------------------------------- level block */
 /* Full-bleed within the shell: this must dominate the first screen. */
 .level {
-  border: var(--rule) solid var(--ink);
+  border: var(--rule) solid var(--edge);
   border-radius: var(--radius);
   background: var(--level-fill, var(--cream));
   color: var(--level-fg, var(--ink));
@@ -360,7 +378,7 @@ body {
 .kv--sub .kv__v { font-size: 16px; }
 .kv__u { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
 .kv__v--chip {
-  border: 2px solid var(--ink);
+  border: 2px solid var(--edge);
   border-radius: var(--radius);
   padding: 3px 8px;
   font-size: 13px;
@@ -390,7 +408,7 @@ body {
 .slot {
   flex: 0 0 auto;
   width: 46px;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--edge);
   border-radius: var(--radius);
   overflow: hidden;
   background: var(--bg);
@@ -404,7 +422,7 @@ body {
   padding: 3px 0;
   background: var(--bg);
   color: var(--fg);
-  border-bottom: 2px solid var(--ink);
+  border-bottom: 2px solid var(--edge);
 }
 .slot__swatch {
   display: block;
@@ -458,13 +476,13 @@ body {
 .act--lower { opacity: 0.62; }
 .act--lower .act__head { font-size: 12px; }
 .act--lower .act__list { font-size: 15px; }
-.act--current { border-width: var(--rule); border-color: var(--ink); }
+.act--current { border-width: var(--rule); border-color: var(--edge); }
 
 /* ----------------------------------------------------------- danger band */
 .danger {
   background: #000;
   color: #fff;
-  border: var(--rule) solid #000;
+  border: var(--rule) solid var(--edge);
   border-radius: var(--radius);
   padding: 14px;
   margin: 0 0 var(--gap);
@@ -483,7 +501,7 @@ body {
 
 /* --------------------------------------------------------------- banners */
 .banner {
-  border: var(--rule) solid var(--ink);
+  border: var(--rule) solid var(--edge);
   border-radius: var(--radius);
   padding: 11px 12px;
   margin: 0 0 var(--gap);
