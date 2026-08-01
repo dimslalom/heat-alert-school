@@ -98,6 +98,11 @@ body {
   padding: 0 12px;
 }
 
+/* The UA stylesheet's [hidden]{display:none} is a plain rule, so ANY explicit
+   display below (e.g. .screen--centred's flex) would beat it and leave two
+   screens stacked on top of each other. Force it. */
+[hidden] { display: none !important; }
+
 .screen--centred {
   min-height: 55vh;
   display: flex;
