@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+<title>Sekolah Siaga Panas</title>
+<meta name="description" content="Tingkat siaga panas untuk sekolah, dihitung dari data cuaca BMKG.">
+
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#16160F">
+
+<!-- iOS reads manifests only partially, so the same facts are repeated as meta
+     tags. Without these, "Add to Home Screen" on iPhone yields a bookmark that
+     opens in Safari chrome with a screenshot for an icon. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Siaga Panas">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png" type="image/png">
+
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="skip-link" href="#main">Lewati ke isi</a>
+
+<div class="shell">
+
+  <header class="lockup">
+    <img id="logo" class="lockup__mark" src="assets/logo.svg" alt="" width="40" height="40">
+    <div class="lockup__text">
+      <span class="lockup__name">Sekolah Siaga Panas</span>
+      <span class="lockup__sub">Tingkat siaga panas harian</span>
+    </div>
+  </header>
+
+  <!-- ================================================== boot / loading ==== -->
+  <div id="screen-boot" class="screen screen--centred">
+    <p class="boot__text">MEMUAT…</p>
+    <p class="boot__sub">Loading</p>
+  </div>
+
+  <!-- ============================================================ setup ==== -->
+  <main id="screen-setup" class="screen" hidden>
+
+    <section class="panel">
+      <h1 class="h-lead">ATUR LOKASI SEKOLAH</h1>
+      <p class="prose">
+        Pilih desa/kelurahan sekolah satu kali saja. Sekolah tidak berpindah,
+        jadi lokasi ini akan diingat untuk seterusnya.
+      </p>
+      <p class="prose prose--en">Set the school’s village once. It will be remembered.</p>
+    </section>
+
+    <!-- Path (a): geolocation, only ever on an explicit tap. -->
+    <section class="panel">
+      <button id="btn-use-gps" class="btn btn--primary" type="button">
+        Gunakan lokasi saya
+      </button>
+      <p class="hint">
+        Perangkat akan meminta izin lokasi. Hasilnya tetap harus Anda konfirmasi.
+        <span class="hint__en">Uses your device location; you still confirm the match.</span>
+      </p>
+    </section>
+
+    <div class="or-rule"><span>ATAU</span></div>
+
+    <!-- Path (b): manual search. Always available, never depends on geolocation. -->
+    <section class="panel">
+      <h2 class="h-sub">CARI MANUAL</h2>
+      <label class="label" for="q">Nama desa / kelurahan</label>
+      <input id="q" class="input" type="search" inputmode="search"
+             autocomplete="off" autocorrect="off" spellcheck="false"
+             placeholder="Contoh: Gubeng" aria-describedby="q-hint">
+      <p id="q-hint" class="hint">
+        Ketik minimal 2 huruf.
+        <span class="hint__en">Type at least 2 characters.</span>
+      </p>
+      <div id="search-results" class="results" role="region" aria-live="polite"></div>
+    </section>
+
+    <div class="or-rule"><span>ATAU</span></div>
+
+    <!-- Path (b2): drill-down browse for users who do not know the exact name. -->
+    <section class="panel">
+      <h2 class="h-sub">TELUSURI WILAYAH</h2>
+      <div id="browse" class="browse"></div>
+    </section>
+
+    <div id="setup-msg" class="msg-slot" role="status" aria-live="polite"></div>
+
+    <p id="setup-cancel-wrap" class="centre" hidden>
+      <button id="btn-setup-cancel" class="btn btn--quiet" type="button">Batal</button>
+    </p>
+  </main>
+
+  <!-- ========================================================== reading ==== -->
+  <main id="screen-reading" class="screen" hidden>
+
+    <!-- Headline: today's forecast PEAK, because danger peaks in the early
+         afternoon while people check the app in the morning. -->
+    <section id="level-block" class="level" aria-labelledby="level-name">
+      <p id="peak-kicker" class="level__kicker">PUNCAK HARI INI</p>
+      <div id="level-icon" class="level__icon" aria-hidden="true"></div>
+      <h1 id="level-name" class="level__name">—</h1>
+      <p id="level-sub" class="level__sub"></p>
+      <p class="level__value">
+        <span id="peak-value" class="level__num">—</span>
+        <span class="level__unit">°C sWBGT</span>
+      </p>
+      <p id="peak-time" class="level__meta"></p>
+    </section>
+
+    <div id="banner-area" role="status" aria-live="polite"></div>
+
+    <section class="panel panel--tight">
+      <div class="kv">
+        <span class="kv__k">JAM INI</span>
+        <span class="kv__v"><span id="now-value">—</span> <span class="kv__u">°C sWBGT</span></span>
+      </div>
+      <div id="now-level-row" class="kv kv--sub">
+        <span class="kv__k">Tingkat jam ini</span>
+        <span id="now-level" class="kv__v kv__v--chip">—</span>
+      </div>
+      <div class="kv kv--sub">
+        <span class="kv__k">Suhu / lembap</span>
+        <span class="kv__v"><span id="now-temp">—</span> · <span id="now-rh">—</span></span>
+      </div>
+    </section>
+
+    <section class="panel panel--tight">
+      <div class="loc">
+        <div class="loc__body">
+          <span class="loc__label">LOKASI</span>
+          <span id="loc-name" class="loc__name">—</span>
+          <span id="source-line" class="loc__source"></span>
+        </div>
+        <button id="btn-change-loc" class="btn btn--quiet btn--inline" type="button">
+          Ganti lokasi
+        </button>
+      </div>
+    </section>
+
+    <section class="panel panel--tight">
+      <h2 class="h-sub">PERKIRAAN HARI INI</h2>
+      <div id="hour-strip" class="strip" role="list"></div>
+      <p id="strip-note" class="hint"></p>
+    </section>
+
+    <section class="panel panel--tight">
+      <h2 class="h-sub">TINDAKAN</h2>
+      <p class="cumulative">Setiap level mencakup semua tindakan di level sebelumnya.</p>
+      <div id="actions-list"></div>
+    </section>
+
+    <!-- Always visible, at every level. -->
+    <section class="danger">
+      <h2 class="danger__title">TANDA BAHAYA PANAS — LAPOR GURU SEKARANG</h2>
+      <ul class="danger__list">
+        <li>Pusing, mual, sakit kepala</li>
+        <li>Kulit panas tapi tidak berkeringat</li>
+        <li>Bingung atau sangat lemas</li>
+      </ul>
+      <p class="danger__do">Bawa ke UKS, pindahkan ke tempat teduh, beri air.</p>
+    </section>
+
+    <div id="install-area"></div>
+
+    <footer class="foot">
+      <p class="foot__note">
+        Ambang batas level bersifat <strong>sementara</strong> dan digeser ke atas
+        untuk iklim tropis lembap. Angka ini <strong>belum</strong> dikalibrasi
+        terhadap klimatologi setempat dan <strong>bukan</strong> standar resmi.
+      </p>
+      <p class="foot__note foot__note--en">
+        Provisional thresholds, shifted upward for a humid tropical climate.
+        Awaiting calibration against local climatology. Not an official standard.
+      </p>
+      <p class="foot__note">
+        sWBGT dihitung dari suhu dan kelembapan saja (pendekatan BoM/ACSM-87).
+        Nilai cenderung <em>terlalu tinggi</em> saat berawan, berangin, dan malam hari.
+      </p>
+      <p class="foot__attr">
+        Data cuaca: BMKG · Kode wilayah: Permendagri 72/2019 ·
+        Cadangan: Open-Meteo
+      </p>
+      <p class="foot__attr">
+        <button id="btn-refresh" class="btn btn--quiet btn--inline" type="button">Muat ulang data</button>
+      </p>
+    </footer>
+  </main>
+
+  <!-- =========================================================== fatal ==== -->
+  <main id="screen-fatal" class="screen" hidden>
+    <section class="panel panel--alert">
+      <h1 class="h-lead">APLIKASI BERMASALAH</h1>
+      <p id="fatal-msg" class="prose"></p>
+      <p class="prose prose--en">Something went wrong. Try reloading.</p>
+      <button id="btn-fatal-reload" class="btn btn--primary" type="button">Muat ulang</button>
+      <button id="btn-fatal-reset" class="btn btn--quiet" type="button">Atur ulang lokasi</button>
+    </section>
+  </main>
+
+</div>
+
+<!-- Persistent, always on screen. -->
+<div class="reminder" role="note">MINUM · TEDUH · LAPOR</div>
+
+<script src="app.js"></script>
+</body>
+</html>
