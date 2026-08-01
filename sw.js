@@ -6,7 +6,7 @@
 
 /* Bump this to ship an update: it renames both caches, and the old ones are
    deleted on activate. */
-var VERSION = 'v3';
+var VERSION = 'v7';
 var SHELL_CACHE = 'ssp-shell-' + VERSION;
 var DATA_CACHE = 'ssp-data-' + VERSION;
 

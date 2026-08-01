@@ -8,8 +8,8 @@
   "scope": ".",
   "display": "standalone",
   "orientation": "portrait",
-  "theme_color": "#16160F",
-  "background_color": "#FDFBEA",
+  "theme_color": "#FFFFFF",
+  "background_color": "#FFFFFF",
   "categories": ["education", "weather", "health"],
   "icons": [
     {

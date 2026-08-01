@@ -440,8 +440,8 @@
   }
 
   var SOURCE_LABEL = {
-    bmkg: 'BMKG (via wrapper komunitas)',
-    openmeteo: 'Open-Meteo (sumber cadangan)'
+    bmkg: 'BMKG',
+    openmeteo: 'Open-Meteo'
   };
 
   /**
@@ -572,7 +572,6 @@
     box.appendChild(el('p', 'banner__title', m[0]));
     var body = el('p', 'banner__body');
     if (m[2] || extra) body.appendChild(document.createTextNode(extra || m[2]));
-    body.appendChild(el('span', 'banner__en', m[1]));
     box.appendChild(body);
     return box;
   }
@@ -630,8 +629,8 @@
     subs.forEach(function (s) {
       var b = el('button', 'result');
       b.type = 'button';
-      b.appendChild(el('span', 'result__name', s.name + ' — telusuri desa'));
-      b.appendChild(el('span', 'result__path', (s.full_path || '') + ' · pilih desa di dalamnya'));
+      b.appendChild(el('span', 'result__name', 'Telusuri desa di ' + s.name));
+      b.appendChild(el('span', 'result__path', s.full_path || 'Pilih desa di dalam kecamatan ini'));
       b.addEventListener('click', function () { openBrowseVillages(s.code, s.full_path || s.name); });
       box.appendChild(b);
     });
@@ -674,7 +673,7 @@
   }
 
   function browseLoading(crumb, backFn) {
-    browseShell(crumb, backFn).appendChild(el('p', 'hint', 'Memuat… / Loading'));
+    browseShell(crumb, backFn).appendChild(el('p', 'hint', 'Memuat…'));
   }
 
   function browseError(crumb, backFn, e) {
@@ -735,10 +734,10 @@
   /* Path (a): geolocation ------------------------------------------------- */
 
   function useGps() {
-    setSetupMsg(el('p', 'hint', 'Meminta izin lokasi… / Requesting location…'));
+    setSetupMsg(el('p', 'hint', 'Meminta izin lokasi…'));
 
     getPosition().then(function (pos) {
-      setSetupMsg(el('p', 'hint', 'Mencari nama wilayah… / Resolving region…'));
+      setSetupMsg(el('p', 'hint', 'Mencari nama wilayah…'));
       return reverseGeocode(pos.lat, pos.lon).then(function (place) {
         return wilayahSearch(place.village).then(function (items) {
           if (!items.length) throw new AppError('NOT_FOUND');
@@ -782,7 +781,7 @@
    * until BMKG answers once.
    */
   function commitLocation(adm4, displayName, coords) {
-    setSetupMsg(el('p', 'hint', 'Menyimpan lokasi… / Saving…'));
+    setSetupMsg(el('p', 'hint', 'Menyimpan lokasi…'));
 
     var loc = {
       adm4: adm4,
@@ -819,30 +818,15 @@
     var box = $('actions-list');
     clear(box);
 
-    // Current level first, then every lower level in descending order —
-    // present, grouped by name, and visually de-emphasised.
-    var order = [];
-    for (var i = idx; i >= 0; i--) order.push(i);
-
-    order.forEach(function (i, pos) {
-      var lv = LEVELS[i];
-      var wrap = el('div', 'act ' + (pos === 0 ? 'act--current' : 'act--lower'));
-
-      var head = el('div', 'act__head');
-      head.style.setProperty('--act-fill', lv.fill);
-      head.style.setProperty('--act-fg', lv.fg);
-      var ico = el('span');
-      ico.innerHTML = lv.icon; // static literal from LEVELS, never API data
-      head.appendChild(ico);
-      head.appendChild(document.createTextNode(
-        lv.key + (pos === 0 ? ' — ' + lv.sub : '')));
-      wrap.appendChild(head);
-
-      var ul = el('ul', 'act__list');
-      lv.actions.forEach(function (a) { ul.appendChild(el('li', null, a)); });
-      wrap.appendChild(ul);
-      box.appendChild(wrap);
-    });
+    // One checklist is easier to scan than repeating a coloured header for
+    // every cumulative level. The headline already communicates the risk.
+    var ul = el('ul', 'act__list act__list--flat');
+    for (var i = 0; i <= idx; i++) {
+      LEVELS[i].actions.forEach(function (a) {
+        ul.appendChild(el('li', null, a));
+      });
+    }
+    box.appendChild(ul);
   }
 
   function renderStrip(reading, dayKey, nowMs, mark) {
@@ -862,7 +846,6 @@
       sw.style.setProperty('--slot-fill', lv.fill);
       sw.style.setProperty('--slot-fg', lv.fg);
       sw.appendChild(document.createTextNode(num(e.w, 1)));
-      sw.appendChild(el('span', 'slot__code', lv.key));
       cell.appendChild(sw);
 
       cell.setAttribute('aria-label',
@@ -878,10 +861,9 @@
       if (i > -1) strip.scrollLeft = Math.max(0, (i - 1) * 50);
     }
 
-    var note = reading.intervalHours === 3
-      ? 'Interval 3 jam — BMKG hanya menyediakan jam yang belum lewat.'
-      : 'Interval 1 jam — sumber cadangan Open-Meteo.';
-    $('strip-note').textContent = note + ' Sumber: ' + SOURCE_LABEL[reading.source] + '.';
+    $('strip-note').textContent = reading.intervalHours === 3
+      ? 'Prakiraan setiap 3 jam.'
+      : 'Prakiraan setiap 1 jam.';
   }
 
   /** Data older than 24h: no level at all, just a plain statement. */
@@ -889,13 +871,12 @@
     showScreen('screen-reading');
 
     var block = $('level-block');
-    block.className = 'level level--void';
+    block.className = 'level level--void level--compact';
     block.style.removeProperty('--level-fill');
     block.style.removeProperty('--level-fg');
     $('peak-kicker').textContent = 'TIDAK ADA TINGKAT SIAGA';
     clear($('level-icon'));
-    $('level-name').textContent = 'DATA LAMA';
-    $('level-sub').textContent = 'TIDAK BISA DIPAKAI';
+    $('level-name').textContent = 'DATA TERLALU LAMA';
     $('peak-value').textContent = '—';
     $('peak-time').textContent = 'Terakhir diperbarui ' + stampText(reading.fetchedAt);
 
@@ -907,21 +888,16 @@
       'internet lalu muat ulang.'));
 
     $('now-label').textContent = 'JAM INI';
-    $('now-level-label').textContent = 'Tingkat jam ini';
     $('now-value').textContent = '—';
     $('now-temp').textContent = '—';
     $('now-rh').textContent = '—';
-    var chip = $('now-level');
-    chip.textContent = '—';
-    chip.style.removeProperty('--chip-fill');
-    chip.style.removeProperty('--chip-fg');
 
     clear($('hour-strip'));
     $('strip-note').textContent = 'Tidak ditampilkan — data terlalu lama.';
     clear($('actions-list'));
 
     $('loc-name').textContent = loc.displayName || loc.adm4;
-    $('source-line').textContent = 'Sumber terakhir: ' + (SOURCE_LABEL[reading.source] || '—');
+    $('source-line').textContent = SOURCE_LABEL[reading.source] || '—';
   }
 
   function stampText(ms) {
@@ -997,40 +973,32 @@
     var lv = LEVELS[headline.lv];
 
     var block = $('level-block');
-    block.className = 'level' + (lv.key === 'PUTIH' ? ' level--needs-border' : '');
+    block.className = 'level' +
+      (lv.key === 'PUTIH' ? ' level--needs-border' : '') +
+      (lv.sub.length > 12 ? ' level--compact' : '');
     applyLevelVars(block, lv);
 
     $('peak-kicker').textContent = peak ? kicker : (currentIsNow ? 'JAM INI' : 'PERKIRAAN TERDEKAT');
     var iconBox = $('level-icon');
     iconBox.innerHTML = lv.icon; // static literal
-    $('level-name').textContent = lv.key;
-    $('level-sub').textContent = lv.sub;
+    $('level-name').textContent = lv.sub;
     $('peak-value').textContent = num(headline.w, 1);
     $('peak-time').textContent = peak
-      ? 'Perkiraan tertinggi pukul ' + pad2(peak.hour) + '.00' +
-        (kicker === 'PUNCAK BESOK' ? ' besok' : '')
-      : 'Nilai jam berjalan';
+      ? 'Pukul ' + pad2(peak.hour) + '.00'
+      : '';
 
     // Secondary: the current-hour value, labelled for what it actually is.
     if (current) {
-      var clv = LEVELS[current.lv];
       $('now-label').textContent = currentIsNow
         ? 'JAM INI'
-        : 'PERKIRAAN TERDEKAT · ' + pad2(current.hour) + '.00';
-      $('now-level-label').textContent = currentIsNow
-        ? 'Tingkat jam ini'
-        : 'Tingkat pada jam tersebut';
+        : 'PUKUL ' + pad2(current.hour) + '.00';
       $('now-value').textContent = num(current.w, 1);
       $('now-temp').textContent = num(current.t, 0) + ' °C';
       $('now-rh').textContent = num(current.rh, 0) + ' %';
-      var chip = $('now-level');
-      chip.textContent = clv.key + ' · ' + clv.sub;
-      chip.style.setProperty('--chip-fill', clv.fill);
-      chip.style.setProperty('--chip-fg', clv.fg);
     }
 
     $('loc-name').textContent = loc.displayName || loc.adm4;
-    $('source-line').textContent = 'Sumber: ' + SOURCE_LABEL[reading.source];
+    $('source-line').textContent = SOURCE_LABEL[reading.source];
 
     document.querySelector('#screen-reading .h-sub').textContent =
       (kicker === 'PUNCAK BESOK') ? 'PERKIRAAN BESOK' : 'PERKIRAAN HARI INI';
@@ -1068,7 +1036,6 @@
     $('peak-kicker').textContent = 'TIDAK ADA DATA';
     clear($('level-icon'));
     $('level-name').textContent = '—';
-    $('level-sub').textContent = '';
     $('peak-value').textContent = '—';
     $('peak-time').textContent = '';
 
