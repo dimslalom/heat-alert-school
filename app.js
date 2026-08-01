@@ -33,6 +33,8 @@
 
     STALE_MS: 60 * 60 * 1000,        // older than this -> "DATA LAMA" badge
     MAX_AGE_MS: 24 * 60 * 60 * 1000, // older than this -> no level shown at all
+    SCHOOL_START_HOUR: 7,
+    SCHOOL_END_HOUR: 17,
 
     KEY_LOC: 'ssp.location',
     KEY_READING: 'ssp.lastReading',
@@ -67,6 +69,11 @@
     var es = 6.112 * Math.exp((17.67 * T) / (T + 243.5));
     var e = (es * RH) / 100;
     return 0.567 * T + 0.393 * e + 3.94;
+  }
+
+  function isSchoolHour(entry) {
+    return entry.hour >= CFG.SCHOOL_START_HOUR &&
+      entry.hour < CFG.SCHOOL_END_HOUR;
   }
 
   /* ------------------------------------------------------------------ levels */
@@ -1216,11 +1223,12 @@
     var slotMs = reading.intervalHours * 3600000;
     var todayKey = dayKeyAt(nowMs, off);
 
-    // The headline is the day's forecast PEAK: danger peaks in the early
-    // afternoon, but people check the app in the morning. Only slots that have
-    // not finished yet can still be acted on.
+    // The headline is the remaining SCHOOL-DAY forecast peak. Night-time
+    // humidity can produce a high sWBGT even after the daytime temperature peak,
+    // but an evening slot is not useful as a school heat-action headline.
     var scope = reading.entries.filter(function (e) {
-      return e.dayKey === todayKey && (e.at + slotMs) > nowMs;
+      return e.dayKey === todayKey && isSchoolHour(e) &&
+        (e.at + slotMs) > nowMs;
     });
     var peakKey = 'peakToday';
     var isTomorrow = false;
@@ -1231,7 +1239,9 @@
       // Roll over rather than showing nothing — tomorrow is what a teacher
       // planning the next school day needs.
       var tomKey = dayKeyAt(nowMs + 86400000, off);
-      scope = reading.entries.filter(function (e) { return e.dayKey === tomKey; });
+      scope = reading.entries.filter(function (e) {
+        return e.dayKey === tomKey && isSchoolHour(e);
+      });
       peakKey = 'peakTomorrow';
       isTomorrow = true;
       scopeDay = tomKey;

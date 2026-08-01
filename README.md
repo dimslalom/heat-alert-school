@@ -2,7 +2,7 @@
 
 PWA mobile-first yang mengubah prakiraan suhu dan kelembapan menjadi satu tingkat
 siaga panas yang bisa langsung ditindaklanjuti sekolah. Angka utama adalah
-**puncak prakiraan hari ini**, bukan suhu saat aplikasi dibuka.
+**puncak prakiraan selama jam sekolah**, bukan suhu saat aplikasi dibuka.
 
 Puncak ditampilkan pada meter lima tingkat dengan kalimat waktu prakiraan yang
 jelas. Antarmuka tersedia dalam Bahasa Indonesia (default), Basa Jawa, English,
@@ -45,6 +45,9 @@ Untuk menguji dari ponsel melalui LAN, gunakan HTTPS. Salah satu cara:
   `DATA LAMA`; data berumur lebih dari 24 jam tidak menampilkan level.
 - BMKG menyediakan slot 3-jam dan menghapus jam yang telah lewat. Open-Meteo
   menyediakan slot 1-jam. Aplikasi menampilkan slot asli tanpa interpolasi.
+- Meter memilih nilai sWBGT tertinggi pada jam sekolah (07.00–16.59). Setelah
+  jam sekolah berakhir, meter beralih ke puncak jam sekolah besok agar prakiraan
+  malam tidak salah ditampilkan sebagai puncak panas sekolah hari ini.
 
 Wrapper tersebut bukan layanan resmi BMKG dan memiliki batas bersama sekitar
 30 permintaan per menit. Untuk produksi, deploy wrapper milik sendiri (misalnya
