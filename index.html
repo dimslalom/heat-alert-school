@@ -23,7 +23,7 @@
 </head>
 <body>
 
-<a class="skip-link" href="#screen-boot">Lewati ke isi</a>
+<a class="skip-link" href="#screen-boot" data-i18n="skip">Lewati ke isi</a>
 
 <div class="shell">
 
@@ -37,53 +37,64 @@
     </div>
   </header>
 
+  <div class="language-control">
+    <label class="sr-only" for="language-selector" data-i18n="languageLabel">Bahasa</label>
+    <select id="language-selector" class="language-select" aria-label="Bahasa">
+      <option value="id">Bahasa Indonesia</option>
+      <option value="jv">Basa Jawa</option>
+      <option value="en">English</option>
+      <option value="zh">中文</option>
+    </select>
+  </div>
+
   <!-- ================================================== boot / loading ==== -->
   <div id="screen-boot" class="screen screen--centred">
-    <p class="boot__text">MEMUAT…</p>
+    <p class="boot__text" data-i18n="loading">MEMUAT…</p>
   </div>
 
   <!-- ============================================================ setup ==== -->
   <main id="screen-setup" class="screen" hidden>
 
     <section class="intro">
-      <h1 class="h-lead">ATUR LOKASI SEKOLAH</h1>
-      <p class="prose">
+      <h1 class="h-lead" data-i18n="setupTitle">ATUR LOKASI SEKOLAH</h1>
+      <p class="prose" data-i18n="setupIntro">
         Pilih desa atau kelurahan sekolah. Lokasi ini akan diingat.
       </p>
     </section>
 
     <!-- Path (a): geolocation, only ever on an explicit tap. -->
     <section class="setup-choice">
-      <button id="btn-use-gps" class="btn btn--primary" type="button">
+      <button id="btn-use-gps" class="btn btn--primary" type="button" data-i18n="useLocation">
         Gunakan lokasi saya
       </button>
-      <p class="hint">
+      <p class="hint" data-i18n="confirmLocation">
         Anda tetap memilih hasil yang benar.
       </p>
     </section>
 
-    <div class="or-rule"><span>ATAU</span></div>
+    <div class="or-rule"><span data-i18n="or">ATAU</span></div>
 
     <!-- Path (b): manual search. Always available, never depends on geolocation. -->
     <section class="setup-choice">
-      <label class="label label--lead" for="q">Cari desa / kelurahan</label>
+      <label class="label label--lead" for="q" data-i18n="searchLabel">Cari desa / kelurahan</label>
       <input id="q" class="input" type="search" inputmode="search"
              autocomplete="off" autocorrect="off" spellcheck="false"
-             placeholder="Contoh: Gubeng" aria-describedby="q-hint">
-      <p id="q-hint" class="hint">Ketik minimal 2 huruf.</p>
+             placeholder="Contoh: Gubeng" data-i18n-placeholder="searchPlaceholder"
+             aria-describedby="q-hint">
+      <p id="q-hint" class="hint" data-i18n="searchHint">Ketik minimal 2 huruf.</p>
       <div id="search-results" class="results" role="region" aria-live="polite"></div>
     </section>
 
     <!-- Path (b2): drill-down browse for users who do not know the exact name. -->
     <details class="browse-disclosure">
-      <summary>Telusuri lewat provinsi</summary>
+      <summary data-i18n="browseProvince">Telusuri lewat provinsi</summary>
       <div id="browse" class="browse"></div>
     </details>
 
     <div id="setup-msg" class="msg-slot" role="status" aria-live="polite"></div>
 
     <p id="setup-cancel-wrap" class="centre" hidden>
-      <button id="btn-setup-cancel" class="btn btn--quiet" type="button">Batal</button>
+      <button id="btn-setup-cancel" class="btn btn--quiet" type="button" data-i18n="cancel">Batal</button>
     </p>
   </main>
 
@@ -93,19 +104,37 @@
     <!-- Headline: today's forecast PEAK, because danger peaks in the early
          afternoon while people check the app in the morning. -->
     <section id="level-block" class="level" aria-labelledby="level-name">
-      <p id="peak-kicker" class="level__kicker">PUNCAK HARI INI</p>
-      <div id="level-icon" class="level__icon" aria-hidden="true"></div>
+      <p id="peak-kicker" class="level__kicker">PERKIRAAN PUNCAK HARI INI</p>
+      <svg id="heat-meter" class="meter" viewBox="0 0 320 170" role="img"
+           aria-labelledby="meter-title meter-desc">
+        <title id="meter-title">Meter tingkat siaga panas</title>
+        <desc id="meter-desc">Jarum menunjukkan tingkat berdasarkan nilai puncak sWBGT.</desc>
+        <g class="meter__bands" fill="none" stroke-width="30" stroke-linecap="butt">
+          <path d="M48 150 A112 112 0 0 1 67.2 87.4" stroke="#E7E7E2"/>
+          <path d="M71.7 81 A112 112 0 0 1 121.7 44.8" stroke="#00B41E"/>
+          <path d="M129.1 42.4 A112 112 0 0 1 190.9 42.4" stroke="#FFF000"/>
+          <path d="M198.3 44.8 A112 112 0 0 1 248.3 81" stroke="#ED1C24"/>
+          <path d="M252.8 87.4 A112 112 0 0 1 272 150" stroke="#000000"/>
+        </g>
+        <g id="meter-needle" class="meter__needle" transform="rotate(-180 160 150)">
+          <line x1="160" y1="150" x2="258" y2="150" stroke="#FFFFFF"
+                stroke-width="11" stroke-linecap="round"/>
+          <line x1="160" y1="150" x2="258" y2="150" stroke="#16160F"
+                stroke-width="5" stroke-linecap="round"/>
+          <circle cx="160" cy="150" r="11" fill="#16160F"/>
+          <circle cx="160" cy="150" r="4" fill="#FFFFFF"/>
+        </g>
+      </svg>
       <h1 id="level-name" class="level__name">—</h1>
       <p class="level__value">
         <span id="peak-value" class="level__num">—</span>
         <span class="level__unit">°C sWBGT</span>
       </p>
-      <p id="peak-time" class="level__meta"></p>
     </section>
 
     <div id="banner-area" role="status" aria-live="polite"></div>
 
-    <section class="current">
+    <section id="current-block" class="current">
       <div class="current__head">
         <span id="now-label" class="current__label">JAM INI</span>
       </div>
@@ -115,11 +144,11 @@
       </p>
       <div class="conditions">
         <div class="condition">
-          <span class="condition__label">SUHU</span>
+          <span class="condition__label" data-i18n="temperature">SUHU</span>
           <span id="now-temp" class="condition__value">—</span>
         </div>
         <div class="condition">
-          <span class="condition__label">KELEMBAPAN</span>
+          <span class="condition__label" data-i18n="humidity">KELEMBAPAN</span>
           <span id="now-rh" class="condition__value">—</span>
         </div>
       </div>
@@ -128,62 +157,62 @@
     <section class="location">
       <div class="loc">
         <div class="loc__body">
-          <span class="loc__label">LOKASI</span>
+          <span class="loc__label" data-i18n="location">LOKASI</span>
           <span id="loc-name" class="loc__name">—</span>
           <span id="source-line" class="loc__source"></span>
         </div>
-        <button id="btn-change-loc" class="btn btn--quiet btn--inline" type="button">
+        <button id="btn-change-loc" class="btn btn--quiet btn--inline" type="button" data-i18n="changeLocation">
           Ganti lokasi
         </button>
       </div>
     </section>
 
     <section class="content-section">
-      <h2 class="h-sub">PERKIRAAN HARI INI</h2>
+      <h2 id="forecast-heading" class="h-sub" data-i18n="forecastToday">PERKIRAAN HARI INI</h2>
       <div id="hour-strip" class="strip" role="list"></div>
       <p id="strip-note" class="hint"></p>
     </section>
 
     <section class="content-section">
-      <h2 class="h-sub">TINDAKAN</h2>
-      <p class="cumulative">Lakukan semua langkah berikut.</p>
+      <h2 class="h-sub" data-i18n="actions">TINDAKAN</h2>
+      <p class="cumulative" data-i18n="actionsIntro">Lakukan semua langkah berikut.</p>
       <div id="actions-list"></div>
     </section>
 
     <!-- Always visible, at every level. -->
     <section class="danger">
-      <h2 class="danger__title">LAPOR GURU SEKARANG</h2>
-      <p class="danger__intro">Jika ada tanda bahaya panas:</p>
+      <h2 class="danger__title" data-i18n="dangerTitle">LAPOR GURU SEKARANG</h2>
+      <p class="danger__intro" data-i18n="dangerIntro">Jika ada tanda bahaya panas:</p>
       <ul class="danger__list">
-        <li>Pusing, mual, sakit kepala</li>
-        <li>Kulit panas tapi tidak berkeringat</li>
-        <li>Bingung atau sangat lemas</li>
+        <li data-i18n="danger1">Pusing, mual, sakit kepala</li>
+        <li data-i18n="danger2">Kulit panas tapi tidak berkeringat</li>
+        <li data-i18n="danger3">Bingung atau sangat lemas</li>
       </ul>
-      <p class="danger__do">Bawa ke UKS, pindahkan ke tempat teduh, beri air.</p>
+      <p class="danger__do" data-i18n="dangerDo">Bawa ke UKS, pindahkan ke tempat teduh, beri air.</p>
     </section>
 
     <div id="install-area"></div>
 
     <footer class="foot">
       <details class="foot__details">
-        <summary>Tentang perhitungan</summary>
-        <p class="foot__note">
+        <summary data-i18n="aboutCalculation">Tentang perhitungan</summary>
+        <p class="foot__note" data-i18n="about1">
           Ambang level masih sementara, belum dikalibrasi terhadap klimatologi
           setempat, dan bukan standar resmi.
         </p>
-        <p class="foot__note">
+        <p class="foot__note" data-i18n="about2">
           sWBGT dihitung dari suhu dan kelembapan. Nilainya cenderung terlalu
           tinggi saat berawan, berangin, atau malam hari.
         </p>
-        <p class="foot__note">
+        <p class="foot__note" data-i18n="about3">
           Angka desimal sWBGT adalah hasil perhitungan, bukan ketelitian pengukuran.
         </p>
-        <p class="foot__attr">Data cuaca: BMKG</p>
-        <p class="foot__attr">Cadangan: Open-Meteo</p>
-        <p class="foot__attr">Kode wilayah: Permendagri 72/2019</p>
+        <p class="foot__attr" data-i18n="weatherSource">Data cuaca: BMKG</p>
+        <p class="foot__attr" data-i18n="fallbackSource">Cadangan: Open-Meteo</p>
+        <p class="foot__attr" data-i18n="regionCodes">Kode wilayah: Permendagri 72/2019</p>
       </details>
       <p class="foot__attr">
-        <button id="btn-refresh" class="btn btn--quiet btn--inline" type="button">Muat ulang data</button>
+        <button id="btn-refresh" class="btn btn--quiet btn--inline" type="button" data-i18n="refresh">Muat ulang data</button>
       </p>
     </footer>
   </main>
@@ -191,11 +220,10 @@
   <!-- =========================================================== fatal ==== -->
   <main id="screen-fatal" class="screen" hidden>
     <section class="panel panel--alert">
-      <h1 class="h-lead">APLIKASI BERMASALAH</h1>
+      <h1 class="h-lead" data-i18n="fatalTitle">APLIKASI BERMASALAH</h1>
       <p id="fatal-msg" class="prose"></p>
-      <p class="prose prose--en">Something went wrong. Try reloading.</p>
-      <button id="btn-fatal-reload" class="btn btn--primary" type="button">Muat ulang</button>
-      <button id="btn-fatal-reset" class="btn btn--quiet" type="button">Atur ulang lokasi</button>
+      <button id="btn-fatal-reload" class="btn btn--primary" type="button" data-i18n="reload">Muat ulang</button>
+      <button id="btn-fatal-reset" class="btn btn--quiet" type="button" data-i18n="resetLocation">Atur ulang lokasi</button>
     </section>
   </main>
 
@@ -203,9 +231,9 @@
 
 <!-- Persistent, always on screen. -->
 <div class="reminder" role="note">
-  <span>MINUM</span>
-  <span>TEDUH</span>
-  <span>LAPOR</span>
+  <span data-i18n="drink">MINUM</span>
+  <span data-i18n="shade">TEDUH</span>
+  <span data-i18n="report">LAPOR</span>
 </div>
 
 <script src="app.js"></script>

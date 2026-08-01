@@ -113,6 +113,17 @@ body {
   background: var(--ink); color: var(--cream);
   padding: 10px 14px;
 }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 /* Visible focus everywhere — this app is used one-handed, outdoors, in a hurry. */
 :focus-visible {
@@ -153,6 +164,21 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+.language-control {
+  display: flex;
+  justify-content: flex-end;
+  margin: -8px 2px 18px;
+}
+.language-select {
+  min-height: 40px;
+  padding: 7px 34px 7px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--fg);
+  font: 700 15px/1 var(--font);
+  cursor: pointer;
+}
 
 .boot__text { font-size: 28px; font-weight: 700; letter-spacing: 0.06em; margin: 0; }
 
@@ -161,24 +187,30 @@ body {
 .level {
   border: 0;
   border-radius: 16px;
-  background: var(--level-fill, var(--cream));
-  color: var(--level-fg, var(--ink));
-  padding: 24px 16px 22px;
+  background: #FFFFFF;
+  color: var(--ink);
+  padding: 22px 12px 22px;
   margin: 0 0 24px;
   text-align: center;
+  box-shadow: inset 0 0 0 1px rgba(22, 22, 15, 0.16);
 }
 .level__kicker {
-  margin: 0 0 6px;
+  margin: 0 0 8px;
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   opacity: 0.85;
 }
-.level__icon { display: block; margin: 0 auto 4px; }
-.level__icon svg { width: 42px; height: 42px; display: block; margin: 0 auto; }
+.meter {
+  display: block;
+  width: min(100%, 320px);
+  height: auto;
+  margin: 0 auto -2px;
+  overflow: visible;
+}
 .level__name {
-  margin: 4px auto 16px;
+  margin: 0 auto 12px;
   max-width: 9em;
   font-size: clamp(48px, 17vw, 68px);
   font-weight: 700;
@@ -191,9 +223,7 @@ body {
 .level__value { margin: 0; display: flex; align-items: baseline; justify-content: center; gap: 6px; }
 .level__num { font-size: 42px; font-weight: 700; line-height: 1; }
 .level__unit { font-size: 14px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.85; }
-.level__meta { margin: 8px 0 0; font-size: 13px; letter-spacing: 0.02em; opacity: 0.85; }
-
-/* PUTIH only needs a faint edge against the cream page. */
+/* The meter carries the level colours; the card stays neutral. */
 .level--needs-border { box-shadow: inset 0 0 0 1px rgba(22, 22, 15, 0.16); }
 
 /* When data is too old to trust, no level is shown at all. */

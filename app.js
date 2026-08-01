@@ -35,7 +35,8 @@
     MAX_AGE_MS: 24 * 60 * 60 * 1000, // older than this -> no level shown at all
 
     KEY_LOC: 'ssp.location',
-    KEY_READING: 'ssp.lastReading'
+    KEY_READING: 'ssp.lastReading',
+    KEY_LANG: 'ssp.language'
   };
 
   /* -------------------------------------------------------------- computation */
@@ -70,17 +71,6 @@
 
   /* ------------------------------------------------------------------ levels */
 
-  // Colour is never the only signal: each level also carries a WORD and a
-  // distinct icon silhouette, for colour-blind users and for bright sunlight
-  // where hue collapses on a phone screen.
-  var IC = {
-    check: '<svg viewBox="0 0 24 24" role="img" aria-hidden="true"><circle cx="12" cy="12" r="9.2" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M7.4 12.4l3.1 3.1 6.2-6.6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square"/></svg>',
-    drop: '<svg viewBox="0 0 24 24" role="img" aria-hidden="true"><path d="M12 2.4c4.1 5.7 6.2 8.7 6.2 11.2A6.2 6.2 0 0 1 5.8 13.6C5.8 11.1 7.9 8.1 12 2.4z" fill="currentColor"/></svg>',
-    tri: '<svg viewBox="0 0 24 24" role="img" aria-hidden="true"><path d="M12 2.6l10 18.8H2z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="miter"/><rect x="10.85" y="9" width="2.3" height="6.4" fill="currentColor"/><rect x="10.85" y="16.6" width="2.3" height="2.3" fill="currentColor"/></svg>',
-    oct: '<svg viewBox="0 0 24 24" role="img" aria-hidden="true"><path d="M8.2 2.2h7.6l6 6v7.6l-6 6H8.2l-6-6V8.2z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="miter"/><rect x="10.85" y="6.6" width="2.3" height="7" fill="currentColor"/><rect x="10.85" y="15.1" width="2.3" height="2.3" fill="currentColor"/></svg>',
-    octx: '<svg viewBox="0 0 24 24" role="img" aria-hidden="true"><path d="M8.2 2.2h7.6l6 6v7.6l-6 6H8.2l-6-6V8.2z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="miter"/><path d="M8.4 8.4l7.2 7.2M15.6 8.4l-7.2 7.2" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square"/></svg>'
-  };
-
   /**
    * PROVISIONAL bands, deliberately shifted upward for a humid tropical
    * climate. The standard US WBGT flag thresholds would read black on nearly
@@ -88,54 +78,342 @@
    * await calibration against local climatology and are NOT an official
    * standard — the UI says so in the footnote.
    *
-   * Bands are cumulative: each level's actions include every lower level's.
+   * The translated names and cumulative actions live in I18N below.
    */
   var LEVELS = [
-    {
-      key: 'PUTIH', min: -Infinity, sub: 'AMAN',
-      fill: '#FFFFFF', fg: '#000000', border: true, icon: IC.check,
-      actions: [
-        'Anak bawa botol minum sendiri.',
-        'Guru ingatkan minum saat istirahat.'
-      ]
-    },
-    {
-      key: 'HIJAU', min: 31.0, sub: 'SEDANG',
-      fill: '#00B41E', fg: '#FFFFFF', icon: IC.drop,
-      actions: [
-        'Minum tiap jam, guru yang mengingatkan.',
-        'Jendela dibuka, kipas menyala.',
-        'Topi saat olahraga dan istirahat.'
-      ]
-    },
-    {
-      key: 'KUNING', min: 32.5, sub: 'MENINGKAT',
-      fill: '#FFF000', fg: '#000000', icon: IC.tri,
-      actions: [
-        'Olahraga berat hindari 11:00-15:00.',
-        'Istirahat main di teduh.',
-        'Botol minum di meja, bukan di tas.'
-      ]
-    },
-    {
-      key: 'MERAH', min: 34.0, sub: 'RISIKO TINGGI',
-      fill: '#ED1C24', fg: '#FFFFFF', icon: IC.oct,
-      actions: [
-        'Tidak ada kegiatan luar ruang 09:00-16:00.',
-        'Olahraga pindah ke jam pertama atau setelah 16:00.',
-        'Gorden sisi matahari ditutup.'
-      ]
-    },
-    {
-      key: 'HITAM', min: 35.5, sub: 'RISIKO SANGAT TINGGI',
-      fill: '#000000', fg: '#FFFFFF', icon: IC.octx,
-      actions: [
-        'Olahraga luar ruang hanya sebelum 08:00.',
-        'Upacara dan ekstrakurikuler luar ruang ditiadakan.',
-        'Minum tiap 20 menit, UKS disiapkan.'
-      ]
-    }
+    { key: 'PUTIH',  min: -Infinity, fill: '#FFFFFF', fg: '#000000' },
+    { key: 'HIJAU',  min: 31.0,      fill: '#00B41E', fg: '#FFFFFF' },
+    { key: 'KUNING', min: 32.5,      fill: '#FFF000', fg: '#000000' },
+    { key: 'MERAH',  min: 34.0,      fill: '#ED1C24', fg: '#FFFFFF' },
+    { key: 'HITAM',  min: 35.5,      fill: '#000000', fg: '#FFFFFF' }
   ];
+
+  /* --------------------------------------------------------------- language */
+
+  var language = 'id';
+  var lastReadingView = null;
+
+  var I18N = {
+    id: {
+      locale: 'id-ID',
+      text: {
+        skip: 'Lewati ke isi', languageLabel: 'Bahasa', loading: 'MEMUAT…',
+        setupTitle: 'ATUR LOKASI SEKOLAH',
+        setupIntro: 'Pilih desa atau kelurahan sekolah. Lokasi ini akan diingat.',
+        useLocation: 'Gunakan lokasi saya', confirmLocation: 'Anda tetap memilih hasil yang benar.',
+        or: 'ATAU', searchLabel: 'Cari desa / kelurahan', searchPlaceholder: 'Contoh: Gubeng',
+        searchHint: 'Ketik minimal 2 huruf.', browseProvince: 'Telusuri lewat provinsi',
+        cancel: 'Batal', back: '← Kembali', loadingShort: 'Memuat…',
+        requestingLocation: 'Meminta izin lokasi…', resolvingRegion: 'Mencari nama wilayah…',
+        savingLocation: 'Menyimpan lokasi…', bestMatch: 'Paling cocok',
+        browseVillages: 'Telusuri desa di {name}', chooseVillage: 'Pilih desa di kecamatan ini',
+        detected: 'Terdeteksi: {place}. Pastikan wilayah di bawah ini benar.',
+        locationSavedNoWeather: 'Lokasi tersimpan, tetapi data cuaca belum bisa diambil.',
+        peakToday: 'PERKIRAAN PUNCAK HARI INI', peakTomorrow: 'PERKIRAAN PUNCAK BESOK',
+        currentHour: 'JAM INI', atTime: 'PUKUL {time}', temperature: 'SUHU',
+        humidity: 'KELEMBAPAN', location: 'LOKASI', changeLocation: 'Ganti lokasi',
+        forecastToday: 'PERKIRAAN HARI INI', forecastTomorrow: 'PERKIRAAN BESOK',
+        actions: 'TINDAKAN', actionsIntro: 'Lakukan semua langkah berikut.',
+        interval3: 'Prakiraan setiap 3 jam.', interval1: 'Prakiraan setiap 1 jam.',
+        nowA11y: 'jam ini', nearestA11y: 'perkiraan terdekat',
+        dangerTitle: 'LAPOR GURU SEKARANG', dangerIntro: 'Jika ada tanda bahaya panas:',
+        danger1: 'Pusing, mual, sakit kepala', danger2: 'Kulit panas tapi tidak berkeringat',
+        danger3: 'Bingung atau sangat lemas',
+        dangerDo: 'Bawa ke UKS, pindahkan ke tempat teduh, beri air.',
+        aboutCalculation: 'Tentang perhitungan',
+        about1: 'Ambang level masih sementara, belum dikalibrasi terhadap klimatologi setempat, dan bukan standar resmi.',
+        about2: 'sWBGT dihitung dari suhu dan kelembapan. Nilainya cenderung terlalu tinggi saat berawan, berangin, atau malam hari.',
+        about3: 'Angka desimal sWBGT adalah hasil perhitungan, bukan ketelitian pengukuran.',
+        weatherSource: 'Data cuaca: BMKG', fallbackSource: 'Cadangan: Open-Meteo',
+        regionCodes: 'Kode wilayah: Permendagri 72/2019', refresh: 'Muat ulang data',
+        fatalTitle: 'APLIKASI BERMASALAH', fatalBody: 'Terjadi kesalahan tak terduga. Coba muat ulang halaman.',
+        reload: 'Muat ulang', resetLocation: 'Atur ulang lokasi',
+        drink: 'MINUM', shade: 'TEDUH', report: 'LAPOR',
+        meterTitle: 'Meter tingkat siaga panas',
+        meterDesc: 'Jarum menunjukkan tingkat berdasarkan nilai puncak sWBGT.',
+        noAlertLevel: 'TIDAK ADA TINGKAT SIAGA', dataTooOld: 'DATA TERLALU LAMA',
+        lastUpdated: 'Terakhir diperbarui {time}', tooOldStrip: 'Tidak ditampilkan karena data terlalu lama.',
+        noData: 'TIDAK ADA DATA', staleMessage: 'Data lama. Terakhir diperbarui {time}. Angka ini belum tentu berlaku sekarang.',
+        fallbackMessage: 'Beralih otomatis ke Open-Meteo.',
+        tooOldMessage: 'Data terakhir berumur lebih dari 24 jam. Tingkat siaga tidak ditampilkan. Sambungkan internet lalu muat ulang.',
+        installTitle: 'Pasang di ponsel', installBody: 'Buka lebih cepat dan tetap bisa dipakai tanpa internet.',
+        installButton: 'Tambah ke Layar Utama', iosInstallTitle: 'Pasang di iPhone atau iPad',
+        iosInstallBody: 'Ketuk Bagikan di Safari, lalu pilih “Add to Home Screen”.'
+      },
+      levels: [
+        { name: 'AMAN', actions: ['Anak bawa botol minum sendiri.', 'Guru ingatkan minum saat istirahat.'] },
+        { name: 'SEDANG', actions: ['Minum tiap jam, guru yang mengingatkan.', 'Buka jendela dan nyalakan kipas.', 'Pakai topi saat olahraga dan istirahat.'] },
+        { name: 'MENINGKAT', actions: ['Hindari olahraga berat pukul 11.00–15.00.', 'Bermain di tempat teduh saat istirahat.', 'Taruh botol minum di meja.'] },
+        { name: 'RISIKO TINGGI', actions: ['Hentikan kegiatan luar ruang pukul 09.00–16.00.', 'Pindahkan olahraga ke jam pertama atau setelah 16.00.', 'Tutup gorden di sisi yang terkena matahari.'] },
+        { name: 'RISIKO SANGAT TINGGI', actions: ['Olahraga luar ruang hanya sebelum 08.00.', 'Tiadakan upacara dan ekstrakurikuler luar ruang.', 'Minum tiap 20 menit dan siapkan UKS.'] }
+      ],
+      errors: {
+        GEO_UNSUPPORTED: ['Perangkat tidak mendukung lokasi.', 'Gunakan pencarian manual.'],
+        GEO_DENIED: ['Izin lokasi ditolak.', 'Cari desa atau kelurahan secara manual.'],
+        GEO_UNAVAILABLE: ['Posisi tidak dapat ditentukan.', 'Coba lagi atau cari manual.'],
+        GEO_TIMEOUT: ['Pencarian lokasi terlalu lama.', 'Coba lagi atau cari manual.'],
+        GEOCODE_FAIL: ['Nama wilayah tidak ditemukan dari posisi Anda.', 'Silakan cari manual.'],
+        NOT_FOUND: ['Wilayah tidak ditemukan.', 'Coba nama lain atau telusuri lewat provinsi.'],
+        AMBIGUOUS: ['Ada beberapa wilayah dengan nama serupa.', 'Pilih wilayah yang benar.'],
+        UNREACHABLE: ['Sumber cuaca tidak dapat dihubungi.', 'Coba lagi sebentar lagi.'],
+        MALFORMED: ['Data cuaca tidak terbaca.', 'Coba muat ulang.'],
+        RATE_LIMIT: ['Terlalu banyak permintaan.', 'Tunggu sebentar lalu coba lagi.'],
+        NO_COORDS: ['Koordinat lokasi belum tersimpan.', 'Sumber cadangan belum dapat dipakai.'],
+        OFFLINE: ['Tidak ada koneksi internet.', 'Data terakhir mungkin sudah lama.'],
+        ALL_FAILED: ['Semua sumber cuaca gagal dihubungi.', 'Coba lagi saat internet tersedia.'],
+        NO_DATA: ['Belum ada data cuaca untuk lokasi ini.', 'Coba wilayah terdekat.']
+      }
+    },
+    jv: {
+      locale: 'jv-ID',
+      text: {
+        skip: 'Langsung menyang isi', languageLabel: 'Basa', loading: 'NGLADHÈK…',
+        setupTitle: 'ATUR PANGGONAN SEKOLAH',
+        setupIntro: 'Pilih désa utawa kelurahan sekolah. Panggonan iki bakal dieling.',
+        useLocation: 'Gunakna panggonanku', confirmLocation: 'Sampeyan tetep milih asil sing bener.',
+        or: 'UTAWA', searchLabel: 'Goleki désa / kelurahan', searchPlaceholder: 'Tuladha: Gubeng',
+        searchHint: 'Ketik paling ora 2 aksara.', browseProvince: 'Telusuri liwat provinsi',
+        cancel: 'Batal', back: '← Bali', loadingShort: 'Ngundhuh…',
+        requestingLocation: 'Nyuwun idin panggonan…', resolvingRegion: 'Nggoleki jeneng wilayah…',
+        savingLocation: 'Nyimpen panggonan…', bestMatch: 'Paling cocog',
+        browseVillages: 'Telusuri désa ing {name}', chooseVillage: 'Pilih désa ing kecamatan iki',
+        detected: 'Katemokake: {place}. Pesthekake wilayah ing ngisor iki bener.',
+        locationSavedNoWeather: 'Panggonan wis disimpen, nanging data cuaca durung bisa dijupuk.',
+        peakToday: 'PUNCAK DIPRAKIRAKAKE DINA IKI', peakTomorrow: 'PUNCAK DIPRAKIRAKAKE SESUK',
+        currentHour: 'SAIKI', atTime: 'JAM {time}', temperature: 'SUHU',
+        humidity: 'KELEMBAPAN', location: 'PANGGONAN', changeLocation: 'Ganti panggonan',
+        forecastToday: 'PRAKIRAAN DINA IKI', forecastTomorrow: 'PRAKIRAAN SESUK',
+        actions: 'TINDAKAN', actionsIntro: 'Tindakna kabèh langkah iki.',
+        interval3: 'Prakiraan saben 3 jam.', interval1: 'Prakiraan saben 1 jam.',
+        nowA11y: 'saiki', nearestA11y: 'prakiraan paling cedhak',
+        dangerTitle: 'LAPOR GURU SAIKI', dangerIntro: 'Yen ana tandha bebaya panas:',
+        danger1: 'Mumet, mual, utawa sirah lara', danger2: 'Kulit panas nanging ora kringetan',
+        danger3: 'Bingung utawa lemes banget',
+        dangerDo: 'Gawa menyang UKS, pindhahna menyang panggonan sing ayom, lan wènèhana banyu.',
+        aboutCalculation: 'Bab petungan',
+        about1: 'Wates tingkat iki isih sementara, durung dikalibrasi karo iklim lokal, lan dudu standar resmi.',
+        about2: 'sWBGT diitung saka suhu lan kelembapan. Nilai bisa kakehan nalika mendhung, ana angin, utawa wengi.',
+        about3: 'Angka desimal sWBGT iku asil petungan, dudu ketelitian pangukuran.',
+        weatherSource: 'Data cuaca: BMKG', fallbackSource: 'Cadangan: Open-Meteo',
+        regionCodes: 'Kode wilayah: Permendagri 72/2019', refresh: 'Anyari data',
+        fatalTitle: 'APLIKASI ANA MASALAH', fatalBody: 'Ana kaluputan sing ora dinyana. Coba bukak ulang kaca iki.',
+        reload: 'Bukak ulang', resetLocation: 'Atur ulang panggonan',
+        drink: 'NGOMBA', shade: 'AYOM', report: 'LAPOR',
+        meterTitle: 'Meter tingkat siaga panas',
+        meterDesc: 'Jarum nuduhake tingkat adhedhasar nilai puncak sWBGT.',
+        noAlertLevel: 'ORA ANA TINGKAT SIAGA', dataTooOld: 'DATA KESELAREN',
+        lastUpdated: 'Pungkasan dianyari {time}', tooOldStrip: 'Ora ditampilake amarga data wis kesuwen.',
+        noData: 'ORA ANA DATA', staleMessage: 'Data lawas. Pungkasan dianyari {time}. Angka iki bisa wis ora trep.',
+        fallbackMessage: 'Ngalih otomatis menyang Open-Meteo.',
+        tooOldMessage: 'Data pungkasan wis luwih saka 24 jam. Tingkat siaga ora ditampilake. Sambungna internet banjur anyari.',
+        installTitle: 'Pasang ing ponsel', installBody: 'Luwih cepet dibukak lan tetep bisa dienggo tanpa internet.',
+        installButton: 'Tambah menyang Layar Ngarep', iosInstallTitle: 'Pasang ing iPhone utawa iPad',
+        iosInstallBody: 'Tutul Bagikan ing Safari, banjur pilih “Add to Home Screen”.'
+      },
+      levels: [
+        { name: 'AMAN', actions: ['Bocah nggawa botol ngombé dhéwé.', 'Guru ngélingaké ngombé nalika ngaso.'] },
+        { name: 'SEDHENG', actions: ['Ngombé saben jam kanthi pangéling saka guru.', 'Bukak jendhéla lan uripna kipas.', 'Nganggo topi nalika olahraga lan ngaso.'] },
+        { name: 'MUNDHAK', actions: ['Aja olahraga abot jam 11.00–15.00.', 'Dolanan ing panggonan ayom nalika ngaso.', 'Selehna botol ngombé ing méja.'] },
+        { name: 'RISIKO DHUWUR', actions: ['Mandhegaké kegiatan njaba jam 09.00–16.00.', 'Pindhahna olahraga menyang jam kapisan utawa sawisé 16.00.', 'Tutup gordhèn ing sisih sing kena srengéngé.'] },
+        { name: 'RISIKO DHUWUR BANGET', actions: ['Olahraga njaba mung sadurungé 08.00.', 'Ora ana upacara lan ekstrakurikuler njaba.', 'Ngombé saben 20 menit lan siapna UKS.'] }
+      ],
+      errors: {
+        GEO_UNSUPPORTED: ['Piranti iki ora ndhukung panggonan.', 'Gunakna panelusuran manual.'],
+        GEO_DENIED: ['Idin panggonan ditolak.', 'Goleki désa utawa kelurahan kanthi manual.'],
+        GEO_UNAVAILABLE: ['Panggonan ora bisa ditemtokake.', 'Coba manèh utawa goleki manual.'],
+        GEO_TIMEOUT: ['Panelusuran panggonan kelamaan.', 'Coba manèh utawa goleki manual.'],
+        GEOCODE_FAIL: ['Jeneng wilayah ora ditemokake saka posisi sampeyan.', 'Mangga goleki manual.'],
+        NOT_FOUND: ['Wilayah ora ditemokake.', 'Coba jeneng liya utawa telusuri liwat provinsi.'],
+        AMBIGUOUS: ['Ana sawetara wilayah kanthi jeneng sing padha.', 'Pilih wilayah sing bener.'],
+        UNREACHABLE: ['Sumber cuaca ora bisa dihubungi.', 'Coba manèh mengko.'],
+        MALFORMED: ['Data cuaca ora bisa diwaca.', 'Coba anyari.'],
+        RATE_LIMIT: ['Panjalukan kakehan.', 'Entèni sedhéla banjur coba manèh.'],
+        NO_COORDS: ['Koordinat panggonan durung disimpen.', 'Sumber cadangan durung bisa dienggo.'],
+        OFFLINE: ['Ora ana sambungan internet.', 'Data pungkasan bisa wis lawas.'],
+        ALL_FAILED: ['Kabèh sumber cuaca ora bisa dihubungi.', 'Coba manèh nalika ana internet.'],
+        NO_DATA: ['Durung ana data cuaca kanggo panggonan iki.', 'Coba wilayah cedhak.']
+      }
+    },
+    en: {
+      locale: 'en',
+      text: {
+        skip: 'Skip to content', languageLabel: 'Language', loading: 'LOADING…',
+        setupTitle: 'SET SCHOOL LOCATION',
+        setupIntro: 'Choose the school’s village or urban ward. This location will be remembered.',
+        useLocation: 'Use my location', confirmLocation: 'You will still confirm the correct result.',
+        or: 'OR', searchLabel: 'Search village / ward', searchPlaceholder: 'Example: Gubeng',
+        searchHint: 'Type at least 2 letters.', browseProvince: 'Browse by province',
+        cancel: 'Cancel', back: '← Back', loadingShort: 'Loading…',
+        requestingLocation: 'Requesting location permission…', resolvingRegion: 'Finding your region…',
+        savingLocation: 'Saving location…', bestMatch: 'Best match',
+        browseVillages: 'Browse villages in {name}', chooseVillage: 'Choose a village in this subdistrict',
+        detected: 'Detected: {place}. Confirm the correct region below.',
+        locationSavedNoWeather: 'Location saved, but weather data is not available yet.',
+        peakToday: 'TODAY’S FORECAST PEAK', peakTomorrow: 'TOMORROW’S FORECAST PEAK',
+        currentHour: 'NOW', atTime: 'AT {time}', temperature: 'TEMPERATURE',
+        humidity: 'HUMIDITY', location: 'LOCATION', changeLocation: 'Change location',
+        forecastToday: 'TODAY’S FORECAST', forecastTomorrow: 'TOMORROW’S FORECAST',
+        actions: 'ACTIONS', actionsIntro: 'Take all of the following steps.',
+        interval3: 'Forecast every 3 hours.', interval1: 'Forecast every hour.',
+        nowA11y: 'now', nearestA11y: 'nearest forecast',
+        dangerTitle: 'TELL A TEACHER NOW', dangerIntro: 'If anyone shows signs of heat illness:',
+        danger1: 'Dizziness, nausea, or headache', danger2: 'Hot skin without sweating',
+        danger3: 'Confusion or severe weakness',
+        dangerDo: 'Go to the school clinic, move into shade, and give water.',
+        aboutCalculation: 'About this calculation',
+        about1: 'These thresholds are provisional, not calibrated to local climate, and are not an official standard.',
+        about2: 'sWBGT uses temperature and humidity. It can read too high when cloudy, windy, or at night.',
+        about3: 'The decimal sWBGT value is calculated precision, not measurement precision.',
+        weatherSource: 'Weather data: BMKG', fallbackSource: 'Fallback: Open-Meteo',
+        regionCodes: 'Region codes: Permendagri 72/2019', refresh: 'Refresh data',
+        fatalTitle: 'THE APP HAS A PROBLEM', fatalBody: 'Something unexpected happened. Reload the page.',
+        reload: 'Reload', resetLocation: 'Reset location',
+        drink: 'DRINK', shade: 'SHADE', report: 'REPORT',
+        meterTitle: 'Heat alert meter',
+        meterDesc: 'The needle shows the level based on the peak sWBGT value.',
+        noAlertLevel: 'NO ALERT LEVEL', dataTooOld: 'DATA TOO OLD',
+        lastUpdated: 'Last updated {time}', tooOldStrip: 'Hidden because the data is too old.',
+        noData: 'NO DATA', staleMessage: 'Old data. Last updated {time}. It may no longer apply.',
+        fallbackMessage: 'Automatically switched to Open-Meteo.',
+        tooOldMessage: 'The latest data is over 24 hours old. No alert level is shown. Connect to the internet and refresh.',
+        installTitle: 'Install on your phone', installBody: 'Open faster and keep using it without internet.',
+        installButton: 'Add to Home Screen', iosInstallTitle: 'Install on iPhone or iPad',
+        iosInstallBody: 'Tap Share in Safari, then choose “Add to Home Screen”.'
+      },
+      levels: [
+        { name: 'SAFE', actions: ['Each student brings a water bottle.', 'Teachers remind students to drink during breaks.'] },
+        { name: 'MODERATE', actions: ['Drink every hour with teacher reminders.', 'Open windows and turn on fans.', 'Wear a hat during sports and breaks.'] },
+        { name: 'ELEVATED', actions: ['Avoid strenuous exercise from 11:00–15:00.', 'Play in the shade during breaks.', 'Keep water bottles on desks.'] },
+        { name: 'HIGH RISK', actions: ['Stop outdoor activities from 09:00–16:00.', 'Move sports to first period or after 16:00.', 'Close curtains on the sunny side.'] },
+        { name: 'VERY HIGH RISK', actions: ['Outdoor sports only before 08:00.', 'Cancel outdoor assemblies and extracurriculars.', 'Drink every 20 minutes and prepare the school clinic.'] }
+      ],
+      errors: {
+        GEO_UNSUPPORTED: ['This device does not support location.', 'Use manual search.'],
+        GEO_DENIED: ['Location permission was denied.', 'Search for the village or ward manually.'],
+        GEO_UNAVAILABLE: ['Your position could not be determined.', 'Try again or search manually.'],
+        GEO_TIMEOUT: ['The location request took too long.', 'Try again or search manually.'],
+        GEOCODE_FAIL: ['No region name was found for your position.', 'Please search manually.'],
+        NOT_FOUND: ['Region not found.', 'Try another name or browse by province.'],
+        AMBIGUOUS: ['Several regions have a similar name.', 'Choose the correct region.'],
+        UNREACHABLE: ['The weather source cannot be reached.', 'Try again shortly.'],
+        MALFORMED: ['The weather data could not be read.', 'Refresh and try again.'],
+        RATE_LIMIT: ['Too many requests.', 'Wait a moment and try again.'],
+        NO_COORDS: ['Location coordinates have not been saved.', 'The fallback source is not available yet.'],
+        OFFLINE: ['There is no internet connection.', 'The latest data may be old.'],
+        ALL_FAILED: ['All weather sources failed.', 'Try again when internet is available.'],
+        NO_DATA: ['No weather data is available for this location.', 'Try a nearby region.']
+      }
+    },
+    zh: {
+      locale: 'zh-CN',
+      text: {
+        skip: '跳到主要内容', languageLabel: '语言', loading: '加载中…',
+        setupTitle: '设置学校位置',
+        setupIntro: '请选择学校所在的村或社区。系统会记住此位置。',
+        useLocation: '使用我的位置', confirmLocation: '您仍需确认正确的搜索结果。',
+        or: '或', searchLabel: '搜索村或社区', searchPlaceholder: '例如：Gubeng',
+        searchHint: '请至少输入两个字符。', browseProvince: '按省份浏览',
+        cancel: '取消', back: '← 返回', loadingShort: '加载中…',
+        requestingLocation: '正在请求位置权限…', resolvingRegion: '正在查找所在地区…',
+        savingLocation: '正在保存位置…', bestMatch: '最匹配',
+        browseVillages: '浏览{name}的村或社区', chooseVillage: '选择此区内的村或社区',
+        detected: '检测到：{place}。请确认下面的地区是否正确。',
+        locationSavedNoWeather: '位置已保存，但暂时无法获取天气数据。',
+        peakToday: '预计今日最高风险', peakTomorrow: '预计明日最高风险',
+        currentHour: '当前', atTime: '{time}', temperature: '温度',
+        humidity: '湿度', location: '位置', changeLocation: '更改位置',
+        forecastToday: '今日预报', forecastTomorrow: '明日预报',
+        actions: '应对措施', actionsIntro: '请执行以下所有措施。',
+        interval3: '每3小时一条预报。', interval1: '每小时一条预报。',
+        nowA11y: '当前', nearestA11y: '最近一条预报',
+        dangerTitle: '立即告知老师', dangerIntro: '如果有人出现中暑迹象：',
+        danger1: '头晕、恶心或头痛', danger2: '皮肤发热但不出汗',
+        danger3: '意识混乱或极度虚弱',
+        dangerDo: '前往校医室，转移到阴凉处，并补充饮水。',
+        aboutCalculation: '关于计算方法',
+        about1: '这些分级阈值仍是临时标准，尚未按当地气候校准，也不是官方标准。',
+        about2: 'sWBGT仅使用温度和湿度计算。在阴天、有风或夜间，数值可能偏高。',
+        about3: 'sWBGT的小数位来自计算，并不代表测量精度。',
+        weatherSource: '天气数据：BMKG', fallbackSource: '备用来源：Open-Meteo',
+        regionCodes: '地区代码：Permendagri 72/2019', refresh: '刷新数据',
+        fatalTitle: '应用发生问题', fatalBody: '发生意外错误，请重新加载页面。',
+        reload: '重新加载', resetLocation: '重置位置',
+        drink: '喝水', shade: '阴凉处', report: '报告',
+        meterTitle: '高温警戒仪表',
+        meterDesc: '指针根据最高sWBGT值显示警戒等级。',
+        noAlertLevel: '无警戒等级', dataTooOld: '数据过旧',
+        lastUpdated: '上次更新：{time}', tooOldStrip: '数据过旧，已隐藏。',
+        noData: '暂无数据', staleMessage: '数据较旧。上次更新：{time}。当前情况可能已经变化。',
+        fallbackMessage: '已自动切换到Open-Meteo。',
+        tooOldMessage: '最新数据已超过24小时，因此不显示警戒等级。请连接互联网并刷新。',
+        installTitle: '安装到手机', installBody: '打开更快，离线时仍可使用。',
+        installButton: '添加到主屏幕', iosInstallTitle: '安装到iPhone或iPad',
+        iosInstallBody: '在Safari中点按“分享”，然后选择“添加到主屏幕”。'
+      },
+      levels: [
+        { name: '安全', actions: ['每名学生自带水瓶。', '老师在课间提醒学生喝水。'] },
+        { name: '中等', actions: ['每小时喝水，并由老师提醒。', '打开窗户和风扇。', '运动和课间活动时戴帽子。'] },
+        { name: '升高', actions: ['11:00至15:00避免剧烈运动。', '课间在阴凉处活动。', '把水瓶放在桌上。'] },
+        { name: '高风险', actions: ['09:00至16:00停止户外活动。', '将体育课改到第一节或16:00以后。', '拉上向阳一侧的窗帘。'] },
+        { name: '极高风险', actions: ['户外运动仅限08:00以前。', '取消户外集会和课外活动。', '每20分钟喝水，并准备好校医室。'] }
+      ],
+      errors: {
+        GEO_UNSUPPORTED: ['此设备不支持定位。', '请使用手动搜索。'],
+        GEO_DENIED: ['位置权限被拒绝。', '请手动搜索村或社区。'],
+        GEO_UNAVAILABLE: ['无法确定您的位置。', '请重试或手动搜索。'],
+        GEO_TIMEOUT: ['位置请求超时。', '请重试或手动搜索。'],
+        GEOCODE_FAIL: ['无法根据位置找到地区名称。', '请手动搜索。'],
+        NOT_FOUND: ['未找到地区。', '请尝试其他名称或按省份浏览。'],
+        AMBIGUOUS: ['有多个名称相近的地区。', '请选择正确的地区。'],
+        UNREACHABLE: ['无法连接天气数据源。', '请稍后重试。'],
+        MALFORMED: ['无法读取天气数据。', '请刷新后重试。'],
+        RATE_LIMIT: ['请求过多。', '请稍候再试。'],
+        NO_COORDS: ['尚未保存位置坐标。', '暂时无法使用备用数据源。'],
+        OFFLINE: ['当前没有网络连接。', '最新数据可能已经过时。'],
+        ALL_FAILED: ['所有天气数据源均不可用。', '请在网络恢复后重试。'],
+        NO_DATA: ['此位置暂无天气数据。', '请尝试附近地区。']
+      }
+    }
+  };
+
+  function langPack() { return I18N[language] || I18N.id; }
+
+  function t(key, vars) {
+    var value = langPack().text[key];
+    if (value == null) value = I18N.id.text[key] || key;
+    if (vars) {
+      Object.keys(vars).forEach(function (name) {
+        value = value.replace(new RegExp('\\{' + name + '\\}', 'g'), vars[name]);
+      });
+    }
+    return value;
+  }
+
+  function translatedLevel(i) {
+    return langPack().levels[i] || I18N.id.levels[i];
+  }
+
+  function translatedError(code) {
+    return langPack().errors[code] || I18N.id.errors[code] || [code, ''];
+  }
+
+  function applyStaticLanguage() {
+    document.documentElement.lang = language === 'zh' ? 'zh-CN' : language;
+    document.title = language === 'en' ? 'Heat-Ready Schools' : 'Sekolah Siaga Panas';
+    Array.prototype.forEach.call(document.querySelectorAll('[data-i18n]'), function (node) {
+      node.textContent = t(node.getAttribute('data-i18n'));
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-i18n-placeholder]'), function (node) {
+      node.setAttribute('placeholder', t(node.getAttribute('data-i18n-placeholder')));
+    });
+    var select = $('language-selector');
+    if (select) {
+      select.value = language;
+      select.setAttribute('aria-label', t('languageLabel'));
+    }
+    $('meter-title').textContent = t('meterTitle');
+    $('meter-desc').textContent = t('meterDesc');
+  }
 
   function levelIndex(v) {
     var i = 0;
@@ -188,14 +466,19 @@
 
   function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
 
-  // Indonesian uses the comma as decimal separator — everywhere in the UI.
+  // Use the selected language's number formatting.
   function num(v, dp) {
     if (v == null || !isFinite(v)) return '—';
     dp = dp == null ? 1 : dp;
     try {
-      return v.toLocaleString('id-ID', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+      return v.toLocaleString(langPack().locale, {
+        minimumFractionDigits: dp,
+        maximumFractionDigits: dp
+      });
     } catch (_) {
-      return v.toFixed(dp).replace('.', ',');
+      return (language === 'id' || language === 'jv')
+        ? v.toFixed(dp).replace('.', ',')
+        : v.toFixed(dp);
     }
   }
 
@@ -567,11 +850,11 @@
   }
 
   function msgBox(cls, code, extra) {
-    var m = ERR[code] || [code, '', ''];
+    var m = translatedError(code);
     var box = el('div', 'banner ' + cls);
     box.appendChild(el('p', 'banner__title', m[0]));
     var body = el('p', 'banner__body');
-    if (m[2] || extra) body.appendChild(document.createTextNode(extra || m[2]));
+    if (m[1] || extra) body.appendChild(document.createTextNode(extra || m[1]));
     box.appendChild(body);
     return box;
   }
@@ -619,7 +902,7 @@
       b.type = 'button';
       b.appendChild(el('span', 'result__name', v.name));
       b.appendChild(el('span', 'result__path', v.full_path || ''));
-      if (isBest) b.appendChild(el('span', 'result__badge', 'Paling cocok'));
+      if (isBest) b.appendChild(el('span', 'result__badge', t('bestMatch')));
       b.addEventListener('click', function () {
         commitLocation(v.code, v.full_path || v.name, null);
       });
@@ -629,8 +912,8 @@
     subs.forEach(function (s) {
       var b = el('button', 'result');
       b.type = 'button';
-      b.appendChild(el('span', 'result__name', 'Telusuri desa di ' + s.name));
-      b.appendChild(el('span', 'result__path', s.full_path || 'Pilih desa di dalam kecamatan ini'));
+      b.appendChild(el('span', 'result__name', t('browseVillages', { name: s.name })));
+      b.appendChild(el('span', 'result__path', s.full_path || t('chooseVillage')));
       b.addEventListener('click', function () { openBrowseVillages(s.code, s.full_path || s.name); });
       box.appendChild(b);
     });
@@ -664,7 +947,7 @@
     clear(box);
     if (crumbText) box.appendChild(el('p', 'browse__crumb', crumbText));
     if (backFn) {
-      var back = el('button', 'btn btn--quiet browse__back', '← Kembali');
+      var back = el('button', 'btn btn--quiet browse__back', t('back'));
       back.type = 'button';
       back.addEventListener('click', backFn);
       box.appendChild(back);
@@ -673,7 +956,7 @@
   }
 
   function browseLoading(crumb, backFn) {
-    browseShell(crumb, backFn).appendChild(el('p', 'hint', 'Memuat…'));
+    browseShell(crumb, backFn).appendChild(el('p', 'hint', t('loadingShort')));
   }
 
   function browseError(crumb, backFn, e) {
@@ -734,10 +1017,10 @@
   /* Path (a): geolocation ------------------------------------------------- */
 
   function useGps() {
-    setSetupMsg(el('p', 'hint', 'Meminta izin lokasi…'));
+    setSetupMsg(el('p', 'hint', t('requestingLocation')));
 
     getPosition().then(function (pos) {
-      setSetupMsg(el('p', 'hint', 'Mencari nama wilayah…'));
+      setSetupMsg(el('p', 'hint', t('resolvingRegion')));
       return reverseGeocode(pos.lat, pos.lon).then(function (place) {
         return wilayahSearch(place.village).then(function (items) {
           if (!items.length) throw new AppError('NOT_FOUND');
@@ -758,9 +1041,9 @@
           var top = scored[0];
           var best = (top && top.s >= 4 && top.it.level === 'village') ? top.it.code : null;
 
-          setSetupMsg(msgBox('banner--info', 'AMBIGUOUS',
-            'Terdeteksi: ' + place.village + (place.city ? ', ' + place.city : '') +
-            '. Pastikan desa/kelurahan di bawah ini benar sebelum memilih.'));
+          setSetupMsg(msgBox('banner--info', 'AMBIGUOUS', t('detected', {
+            place: place.village + (place.city ? ', ' + place.city : '')
+          })));
 
           renderResults(scored.map(function (x) { return x.it; }), best);
           $('search-results').scrollIntoView({ block: 'nearest' });
@@ -781,7 +1064,7 @@
    * until BMKG answers once.
    */
   function commitLocation(adm4, displayName, coords) {
-    setSetupMsg(el('p', 'hint', 'Menyimpan lokasi…'));
+    setSetupMsg(el('p', 'hint', t('savingLocation')));
 
     var loc = {
       adm4: adm4,
@@ -803,15 +1086,26 @@
       boot();
       var area = $('banner-area');
       if (area) area.appendChild(msgBox('banner--error', errOf(e),
-        'Lokasi tersimpan, tetapi data cuaca belum bisa diambil.'));
+        t('locationSavedNoWeather')));
     });
   }
 
   /* ============================================================ READING UI == */
 
-  function applyLevelVars(node, lv) {
-    node.style.setProperty('--level-fill', lv.fill);
-    node.style.setProperty('--level-fg', lv.fg);
+  function setMeter(value) {
+    var meter = $('heat-meter');
+    if (!meter) return;
+    if (!isFinite(value)) {
+      meter.hidden = true;
+      return;
+    }
+    meter.hidden = false;
+    // The visible scale spans 29.5–37.0 °C, with the four provisional
+    // thresholds (31.0, 32.5, 34.0, 35.5) dividing five equal bands.
+    var clamped = Math.max(29.5, Math.min(37.0, value));
+    var angle = -180 + ((clamped - 29.5) / 7.5) * 180;
+    $('meter-needle').setAttribute('transform',
+      'rotate(' + angle.toFixed(1) + ' 160 150)');
   }
 
   function renderActions(idx) {
@@ -822,7 +1116,7 @@
     // every cumulative level. The headline already communicates the risk.
     var ul = el('ul', 'act__list act__list--flat');
     for (var i = 0; i <= idx; i++) {
-      LEVELS[i].actions.forEach(function (a) {
+      translatedLevel(i).actions.forEach(function (a) {
         ul.appendChild(el('li', null, a));
       });
     }
@@ -849,8 +1143,9 @@
       cell.appendChild(sw);
 
       cell.setAttribute('aria-label',
-        pad2(e.hour) + ':00 — ' + lv.key + ' ' + lv.sub + ', ' + num(e.w, 1) + ' derajat sWBGT' +
-        (isMark ? (mark.isNow ? ' (jam ini)' : ' (perkiraan terdekat)') : ''));
+        pad2(e.hour) + ':00, ' + translatedLevel(e.lv).name + ', ' +
+        num(e.w, 1) + ' °C sWBGT' +
+        (isMark ? ' (' + (mark.isNow ? t('nowA11y') : t('nearestA11y')) + ')' : ''));
       strip.appendChild(cell);
     });
 
@@ -861,39 +1156,33 @@
       if (i > -1) strip.scrollLeft = Math.max(0, (i - 1) * 50);
     }
 
-    $('strip-note').textContent = reading.intervalHours === 3
-      ? 'Prakiraan setiap 3 jam.'
-      : 'Prakiraan setiap 1 jam.';
+    $('strip-note').textContent = reading.intervalHours === 3 ? t('interval3') : t('interval1');
   }
 
   /** Data older than 24h: no level at all, just a plain statement. */
   function renderVoid(loc, reading) {
+    lastReadingView = { loc: loc, result: { reading: reading, stale: true, problem: 'OFFLINE' } };
     showScreen('screen-reading');
 
     var block = $('level-block');
     block.className = 'level level--void level--compact';
-    block.style.removeProperty('--level-fill');
-    block.style.removeProperty('--level-fg');
-    $('peak-kicker').textContent = 'TIDAK ADA TINGKAT SIAGA';
-    clear($('level-icon'));
-    $('level-name').textContent = 'DATA TERLALU LAMA';
+    setMeter(null);
+    $('peak-kicker').textContent = t('noAlertLevel');
+    $('level-name').textContent = t('dataTooOld');
     $('peak-value').textContent = '—';
-    $('peak-time').textContent = 'Terakhir diperbarui ' + stampText(reading.fetchedAt);
 
     var area = $('banner-area');
     clear(area);
-    area.appendChild(msgBox('banner--void', 'OFFLINE',
-      'Data terakhir berumur lebih dari 24 jam, jadi tingkat siaga tidak ' +
-      'ditampilkan. Jangan mengambil keputusan dari angka lama. Sambungkan ' +
-      'internet lalu muat ulang.'));
+    area.appendChild(msgBox('banner--void', 'OFFLINE', t('tooOldMessage')));
 
-    $('now-label').textContent = 'JAM INI';
+    $('now-label').textContent = t('currentHour');
     $('now-value').textContent = '—';
     $('now-temp').textContent = '—';
     $('now-rh').textContent = '—';
+    $('current-block').hidden = true;
 
     clear($('hour-strip'));
-    $('strip-note').textContent = 'Tidak ditampilkan — data terlalu lama.';
+    $('strip-note').textContent = t('tooOldStrip');
     clear($('actions-list'));
 
     $('loc-name').textContent = loc.displayName || loc.adm4;
@@ -903,7 +1192,7 @@
   function stampText(ms) {
     var d = new Date(ms);
     try {
-      return d.toLocaleString('id-ID', {
+      return d.toLocaleString(langPack().locale, {
         day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
       });
     } catch (_) {
@@ -913,6 +1202,7 @@
   }
 
   function renderReading(loc, result) {
+    lastReadingView = { loc: loc, result: result };
     var reading = result.reading;
     var nowMs = Date.now();
     var age = nowMs - (reading.fetchedAt || 0);
@@ -932,7 +1222,8 @@
     var scope = reading.entries.filter(function (e) {
       return e.dayKey === todayKey && (e.at + slotMs) > nowMs;
     });
-    var kicker = 'PUNCAK HARI INI';
+    var peakKey = 'peakToday';
+    var isTomorrow = false;
     var scopeDay = todayKey;
 
     if (!scope.length) {
@@ -941,7 +1232,8 @@
       // planning the next school day needs.
       var tomKey = dayKeyAt(nowMs + 86400000, off);
       scope = reading.entries.filter(function (e) { return e.dayKey === tomKey; });
-      kicker = 'PUNCAK BESOK';
+      peakKey = 'peakTomorrow';
+      isTomorrow = true;
       scopeDay = tomKey;
     }
 
@@ -970,28 +1262,24 @@
     }
 
     var headline = peak || current;
-    var lv = LEVELS[headline.lv];
+    var translated = translatedLevel(headline.lv);
 
     var block = $('level-block');
-    block.className = 'level' +
-      (lv.key === 'PUTIH' ? ' level--needs-border' : '') +
-      (lv.sub.length > 12 ? ' level--compact' : '');
-    applyLevelVars(block, lv);
+    block.className = 'level' + (translated.name.length > 12 ? ' level--compact' : '');
+    setMeter(headline.w);
 
-    $('peak-kicker').textContent = peak ? kicker : (currentIsNow ? 'JAM INI' : 'PERKIRAAN TERDEKAT');
-    var iconBox = $('level-icon');
-    iconBox.innerHTML = lv.icon; // static literal
-    $('level-name').textContent = lv.sub;
+    $('peak-kicker').textContent = peak
+      ? t(peakKey)
+      : (currentIsNow ? t('currentHour') : t('nearestA11y'));
+    $('level-name').textContent = translated.name;
     $('peak-value').textContent = num(headline.w, 1);
-    $('peak-time').textContent = peak
-      ? 'Pukul ' + pad2(peak.hour) + '.00'
-      : '';
 
     // Secondary: the current-hour value, labelled for what it actually is.
-    if (current) {
+    $('current-block').hidden = !current || current === headline;
+    if (current && current !== headline) {
       $('now-label').textContent = currentIsNow
-        ? 'JAM INI'
-        : 'PUKUL ' + pad2(current.hour) + '.00';
+        ? t('currentHour')
+        : t('atTime', { time: pad2(current.hour) + '.00' });
       $('now-value').textContent = num(current.w, 1);
       $('now-temp').textContent = num(current.t, 0) + ' °C';
       $('now-rh').textContent = num(current.rh, 0) + ' %';
@@ -1000,8 +1288,7 @@
     $('loc-name').textContent = loc.displayName || loc.adm4;
     $('source-line').textContent = SOURCE_LABEL[reading.source];
 
-    document.querySelector('#screen-reading .h-sub').textContent =
-      (kicker === 'PUNCAK BESOK') ? 'PERKIRAAN BESOK' : 'PERKIRAAN HARI INI';
+    $('forecast-heading').textContent = t(isTomorrow ? 'forecastTomorrow' : 'forecastToday');
 
     renderStrip(reading, scopeDay, nowMs,
       current ? { entry: current, isNow: currentIsNow } : null);
@@ -1017,12 +1304,11 @@
     var isStale = result.stale || age > CFG.STALE_MS;
     if (isStale) {
       area.appendChild(msgBox('banner--stale', result.problem || 'OFFLINE',
-        'DATA LAMA — terakhir diperbarui ' + stampText(reading.fetchedAt) +
-        '. Angka ini belum tentu berlaku sekarang.'));
+        t('staleMessage', { time: stampText(reading.fetchedAt) })));
     }
     if (reading.degradedFrom) {
       area.appendChild(msgBox('banner--info', reading.degradedFrom,
-        'Beralih otomatis ke sumber cadangan Open-Meteo.'));
+        t('fallbackMessage')));
     }
     if ((!isNum(loc.lat, -90, 90) || !isNum(loc.lon, -180, 180)) && !isStale) {
       area.appendChild(msgBox('banner--info', 'NO_COORDS'));
@@ -1030,14 +1316,15 @@
   }
 
   function renderProblem(loc, code) {
+    lastReadingView = null;
     showScreen('screen-reading');
     var block = $('level-block');
     block.className = 'level level--void';
-    $('peak-kicker').textContent = 'TIDAK ADA DATA';
-    clear($('level-icon'));
+    $('current-block').hidden = true;
+    $('peak-kicker').textContent = t('noData');
+    setMeter(null);
     $('level-name').textContent = '—';
     $('peak-value').textContent = '—';
-    $('peak-time').textContent = '';
 
     var area = $('banner-area');
     clear(area);
@@ -1073,10 +1360,9 @@
 
     if (deferredPrompt) {
       var box = el('div', 'install');
-      box.appendChild(el('p', 'install__title', 'Pasang di ponsel'));
-      box.appendChild(el('p', 'install__body',
-        'Buka lebih cepat dan tetap bisa dipakai tanpa internet.'));
-      var b = el('button', 'btn btn--primary', 'Tambah ke Layar Utama');
+      box.appendChild(el('p', 'install__title', t('installTitle')));
+      box.appendChild(el('p', 'install__body', t('installBody')));
+      var b = el('button', 'btn btn--primary', t('installButton'));
       b.type = 'button';
       b.addEventListener('click', function () {
         var p = deferredPrompt;
@@ -1093,12 +1379,29 @@
     // iOS Safari never fires beforeinstallprompt, so it gets instructions.
     if (isIOS()) {
       var ib = el('div', 'install');
-      ib.appendChild(el('p', 'install__title', 'Pasang di iPhone / iPad'));
-      ib.appendChild(el('p', 'install__body',
-        'Ketuk tombol Bagikan (Share) di Safari, lalu pilih “Add to Home Screen”.'));
-      ib.appendChild(el('p', 'install__body',
-        'Tap Share in Safari, then Add to Home Screen.'));
+      ib.appendChild(el('p', 'install__title', t('iosInstallTitle')));
+      ib.appendChild(el('p', 'install__body', t('iosInstallBody')));
       area.appendChild(ib);
+    }
+  }
+
+  function changeLanguage(next) {
+    if (!I18N[next]) return;
+    language = next;
+    store.set(CFG.KEY_LANG, language);
+    applyStaticLanguage();
+
+    if (!$('screen-reading').hidden) {
+      if (lastReadingView) {
+        renderReading(lastReadingView.loc, lastReadingView.result);
+      } else {
+        boot();
+      }
+      renderInstall();
+    } else if (!$('screen-setup').hidden) {
+      renderSetup({ cancellable: !$('setup-cancel-wrap').hidden });
+    } else if (!$('screen-fatal').hidden) {
+      $('fatal-msg').textContent = t('fatalBody');
     }
   }
 
@@ -1126,6 +1429,9 @@
   }
 
   function wire() {
+    $('language-selector').addEventListener('change', function (e) {
+      changeLanguage(e.target.value);
+    });
     $('btn-use-gps').addEventListener('click', useGps);
     wireSearch();
 
@@ -1197,8 +1503,7 @@
   function fatal(detail) {
     try {
       showScreen('screen-fatal');
-      $('fatal-msg').textContent =
-        'Terjadi kesalahan tak terduga. Coba muat ulang halaman.';
+      $('fatal-msg').textContent = t('fatalBody');
     } catch (_) { /* nothing left to do */ }
   }
 
@@ -1208,6 +1513,9 @@
   });
 
   try {
+    var savedLanguage = store.get(CFG.KEY_LANG);
+    if (I18N[savedLanguage]) language = savedLanguage;
+    applyStaticLanguage();
     wire();
     boot();
   } catch (e) {

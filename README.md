@@ -4,6 +4,10 @@ PWA mobile-first yang mengubah prakiraan suhu dan kelembapan menjadi satu tingka
 siaga panas yang bisa langsung ditindaklanjuti sekolah. Angka utama adalah
 **puncak prakiraan hari ini**, bukan suhu saat aplikasi dibuka.
 
+Puncak ditampilkan pada meter lima tingkat dengan kalimat waktu prakiraan yang
+jelas. Antarmuka tersedia dalam Bahasa Indonesia (default), Basa Jawa, English,
+dan 中文; pilihan bahasa disimpan sebagai `ssp.language`.
+
 > **Penting:** ambang level masih sementara, belum dikalibrasi terhadap
 > klimatologi setempat, dan bukan standar resmi. sWBGT di sini hanya memakai
 > suhu dan kelembapan; pendekatan ini cenderung terlalu tinggi saat berawan,
