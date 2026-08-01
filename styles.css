@@ -1,0 +1,536 @@
+/* =============================================================================
+   Sekolah Siaga Panas
+   Flat, high contrast, thick black keylines, no gradients, no shadows.
+   The reference is printed safety signage, not a weather app.
+   Designed against a 380px viewport, one-thumb reach.
+   ========================================================================== */
+
+/* ------------------------------------------------------------------- fonts */
+/* Self-hosted so the app renders correctly offline and on Android, where
+   "Arial Narrow" does not exist. Google serves Archivo Narrow as a VARIABLE
+   font: one file carries the whole 400..700 axis, which is why a single src
+   is declared for a weight RANGE rather than one @font-face per weight.
+   See tools/fetch-fonts.sh. font-display:swap keeps text readable while the
+   font loads — the fallback stack is already condensed on most platforms. */
+@font-face {
+  font-family: 'Archivo Narrow';
+  src: url('assets/fonts/archivo-narrow-latin.woff2') format('woff2');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+                 U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+                 U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Archivo Narrow';
+  src: url('assets/fonts/archivo-narrow-latin-ext.woff2') format('woff2');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+                 U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF,
+                 U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* ------------------------------------------------------------------ tokens */
+:root {
+  /* Level colours. These are the signal — they never change with theme. */
+  --lv-putih:  #FFFFFF;
+  --lv-hijau:  #00B41E;
+  --lv-kuning: #FFF000;
+  --lv-merah:  #ED1C24;
+  --lv-hitam:  #000000;
+
+  --ink:    #16160F;
+  --cream:  #FDFBEA;
+  --muted:  #6E6E68;
+  --orange: #F5921E;
+  --flame:  #F04E23;
+  --red:    #D91E18;
+
+  --bg:      var(--cream);
+  --fg:      var(--ink);
+  --panel:   var(--cream);
+  --keyline: var(--ink);
+  --muted-fg: var(--muted);
+
+  --rule: 3px;      /* thick black keyline */
+  --radius: 4px;    /* one small consistent radius, nothing softer */
+  --gap: 12px;
+  --tap: 44px;      /* minimum tap target */
+
+  --font: 'Archivo Narrow', 'Arial Narrow', 'Roboto Condensed',
+          'Liberation Sans Narrow', system-ui, sans-serif;
+}
+
+/* Dark mode changes the PAGE, never the level colours: a red block must stay
+   red in a dark classroom. Only chrome inverts. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0E0E09;
+    --fg: var(--cream);
+    --panel: #1C1C14;
+    --keyline: #4A4A3E;
+    --muted-fg: #A3A399;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: 17px;
+  line-height: 1.35;
+  /* Clear the persistent reminder bar pinned to the bottom. */
+  padding-bottom: calc(52px + env(safe-area-inset-bottom, 0px));
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.12);
+}
+
+.shell {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0 12px;
+}
+
+.screen--centred {
+  min-height: 55vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+}
+.skip-link:focus {
+  left: 8px; top: 8px;
+  z-index: 20;
+  background: var(--ink); color: var(--cream);
+  padding: 10px 14px;
+}
+
+/* Visible focus everywhere — this app is used one-handed, outdoors, in a hurry. */
+:focus-visible {
+  outline: 3px solid var(--flame);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ lockup */
+.lockup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 2px 10px;
+}
+.lockup__mark { width: 40px; height: 40px; display: block; flex: 0 0 auto; }
+.lockup__text { display: flex; flex-direction: column; min-width: 0; }
+.lockup__name {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-size: 19px;
+  line-height: 1.05;
+}
+.lockup__sub {
+  font-size: 12px;
+  color: var(--muted-fg);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.boot__text { font-size: 28px; font-weight: 700; letter-spacing: 0.06em; margin: 0; }
+.boot__sub { color: var(--muted-fg); text-transform: uppercase; font-size: 12px; letter-spacing: 0.1em; margin: 4px 0 0; }
+
+/* ------------------------------------------------------------- level block */
+/* Full-bleed within the shell: this must dominate the first screen. */
+.level {
+  border: var(--rule) solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--level-fill, var(--cream));
+  color: var(--level-fg, var(--ink));
+  padding: 18px 14px 16px;
+  margin: 0 0 var(--gap);
+  text-align: center;
+}
+.level__kicker {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.level__icon { display: block; margin: 0 auto 4px; }
+.level__icon svg { width: 46px; height: 46px; display: block; margin: 0 auto; }
+.level__name {
+  margin: 0;
+  font-size: clamp(52px, 19vw, 76px);
+  font-weight: 700;
+  line-height: 0.92;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+}
+.level__sub {
+  margin: 6px 0 12px;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.level__value { margin: 0; display: flex; align-items: baseline; justify-content: center; gap: 6px; }
+.level__num { font-size: 46px; font-weight: 700; line-height: 1; }
+.level__unit { font-size: 14px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.85; }
+.level__meta { margin: 8px 0 0; font-size: 13px; letter-spacing: 0.02em; opacity: 0.85; }
+
+/* PUTIH is white on a cream page, so it needs its keyline to read as a block. */
+.level--needs-border { border-width: 5px; }
+
+/* When data is too old to trust, no level is shown at all. */
+.level--void {
+  background: repeating-linear-gradient(
+    45deg, transparent, transparent 9px,
+    rgba(110, 110, 104, 0.22) 9px, rgba(110, 110, 104, 0.22) 18px);
+  color: var(--fg);
+}
+
+/* ------------------------------------------------------------------ panels */
+.panel {
+  border: var(--rule) solid var(--keyline);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 14px;
+  margin: 0 0 var(--gap);
+}
+.panel--tight { padding: 12px; }
+.panel--alert { border-color: var(--red); }
+
+.h-lead {
+  margin: 0 0 8px;
+  font-size: 26px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  line-height: 1.02;
+}
+.h-sub {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.prose { margin: 0 0 8px; }
+.prose--en, .hint__en { color: var(--muted-fg); font-size: 14px; display: block; }
+.hint { margin: 8px 0 0; font-size: 13px; color: var(--muted-fg); }
+.centre { text-align: center; }
+
+.or-rule {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 var(--gap);
+  color: var(--muted-fg);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+.or-rule::before, .or-rule::after {
+  content: '';
+  flex: 1;
+  border-top: 2px solid var(--keyline);
+}
+
+/* ----------------------------------------------------------------- buttons */
+.btn {
+  display: block;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 12px 14px;
+  border: var(--rule) solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--cream);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+.btn + .btn { margin-top: 8px; }
+.btn--primary { background: var(--orange); }
+.btn--quiet { background: transparent; color: var(--fg); border-color: var(--keyline); }
+.btn--inline {
+  display: inline-block;
+  width: auto;
+  min-width: var(--tap);
+  font-size: 14px;
+  padding: 10px 12px;
+}
+/* Never rely on hover: :active carries the whole affordance on touch. */
+.btn:active { transform: translateY(1px); }
+
+/* ----------------------------------------------------------------- inputs */
+.label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-fg);
+  margin-bottom: 6px;
+}
+.input {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 10px 12px;
+  border: var(--rule) solid var(--keyline);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 17px; /* >=16px stops iOS zooming the viewport on focus */
+}
+
+/* ---------------------------------------------------------------- results */
+.results:empty { display: none; }
+.results { margin-top: 10px; }
+.result {
+  display: block;
+  width: 100%;
+  min-height: var(--tap);
+  text-align: left;
+  padding: 10px 12px;
+  border: 2px solid var(--keyline);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+.result + .result { margin-top: 6px; }
+.result__name { display: block; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+.result__path { display: block; font-size: 13px; color: var(--muted-fg); }
+.result--best { border-color: var(--flame); border-width: var(--rule); }
+.result__badge {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 6px;
+  background: var(--flame);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 2px;
+}
+
+.browse__crumb {
+  font-size: 13px;
+  color: var(--muted-fg);
+  margin: 0 0 8px;
+  word-break: break-word;
+}
+.browse__back { margin-bottom: 8px; }
+
+/* ------------------------------------------------------------------- kv ---*/
+.kv {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.kv + .kv { margin-top: 8px; padding-top: 8px; border-top: 2px solid var(--keyline); }
+.kv__k { font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-fg); }
+.kv__v { font-size: 26px; font-weight: 700; }
+.kv--sub .kv__v { font-size: 16px; }
+.kv__u { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
+.kv__v--chip {
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  padding: 3px 8px;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--chip-fill, transparent);
+  color: var(--chip-fg, inherit);
+}
+
+/* ---------------------------------------------------------------- location */
+.loc { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.loc__body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.loc__label { font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-fg); }
+.loc__name { font-size: 17px; font-weight: 700; word-break: break-word; }
+.loc__source { font-size: 12px; color: var(--muted-fg); text-transform: uppercase; letter-spacing: 0.06em; }
+.loc .btn { flex: 0 0 auto; }
+
+/* ------------------------------------------------------------- hour strip */
+.strip {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  /* Momentum scrolling without hiding that there is more to the right. */
+  scrollbar-width: thin;
+}
+.slot {
+  flex: 0 0 auto;
+  width: 46px;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg);
+  text-align: center;
+}
+.slot__hour {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 3px 0;
+  background: var(--bg);
+  color: var(--fg);
+  border-bottom: 2px solid var(--ink);
+}
+.slot__swatch {
+  display: block;
+  padding: 8px 0 9px;
+  background: var(--slot-fill);
+  color: var(--slot-fg);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.slot__code { display: block; font-size: 10px; letter-spacing: 0.06em; }
+/* Current slot is marked by weight, not colour alone. */
+.slot--now { border-width: 4px; border-color: var(--flame); }
+.slot--now .slot__hour { background: var(--flame); color: #fff; border-bottom-color: var(--flame); }
+
+/* ---------------------------------------------------------------- actions */
+.cumulative {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  border-left: 5px solid var(--flame);
+  padding-left: 9px;
+  line-height: 1.3;
+}
+.act { border: 2px solid var(--keyline); border-radius: var(--radius); margin-bottom: 8px; overflow: hidden; }
+.act__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: var(--act-fill);
+  color: var(--act-fg);
+  border-bottom: 2px solid var(--keyline);
+}
+.act__head svg { width: 18px; height: 18px; flex: 0 0 auto; }
+.act__list { margin: 0; padding: 8px 10px 8px 26px; }
+.act__list li { margin: 3px 0; }
+
+/* Lower levels are still shown — de-emphasised, never hidden. */
+.act--lower { opacity: 0.62; }
+.act--lower .act__head { font-size: 12px; }
+.act--lower .act__list { font-size: 15px; }
+.act--current { border-width: var(--rule); border-color: var(--ink); }
+
+/* ----------------------------------------------------------- danger band */
+.danger {
+  background: #000;
+  color: #fff;
+  border: var(--rule) solid #000;
+  border-radius: var(--radius);
+  padding: 14px;
+  margin: 0 0 var(--gap);
+}
+.danger__title {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+}
+.danger__list { margin: 0; padding-left: 20px; }
+.danger__list li { margin: 4px 0; }
+.danger__do { margin: 10px 0 0; font-weight: 700; border-top: 2px solid #fff; padding-top: 9px; }
+
+/* --------------------------------------------------------------- banners */
+.banner {
+  border: var(--rule) solid var(--ink);
+  border-radius: var(--radius);
+  padding: 11px 12px;
+  margin: 0 0 var(--gap);
+  background: var(--kuning, var(--lv-kuning));
+  color: #000;
+}
+.banner__title { margin: 0; font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+.banner__body { margin: 4px 0 0; font-size: 14px; }
+.banner__en { display: block; font-size: 13px; opacity: 0.75; }
+.banner--stale { background: var(--lv-kuning); }
+.banner--error { background: var(--lv-merah); color: #fff; }
+.banner--void  { background: #000; color: #fff; }
+.banner--info  { background: var(--panel); color: var(--fg); border-color: var(--keyline); }
+.banner .btn { margin-top: 10px; }
+
+.msg-slot:empty { display: none; }
+
+/* --------------------------------------------------------------- install */
+.install { border: var(--rule) dashed var(--keyline); border-radius: var(--radius); padding: 12px; margin: 0 0 var(--gap); }
+.install__title { margin: 0 0 6px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; }
+.install__body { margin: 0 0 8px; font-size: 14px; }
+
+/* ------------------------------------------------------------------ foot */
+.foot { padding: 4px 2px 16px; }
+.foot__note { margin: 0 0 8px; font-size: 12px; line-height: 1.35; color: var(--fg); }
+.foot__note--en { color: var(--muted-fg); }
+.foot__attr { margin: 8px 0 0; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted-fg); }
+
+/* -------------------------------------------------------------- reminder */
+/* Persistent: pinned so it is on screen no matter where the user has scrolled. */
+.reminder {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 10;
+  background: var(--ink);
+  color: var(--cream);
+  border-top: var(--rule) solid var(--orange);
+  text-align: center;
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  padding: 13px 8px calc(13px + env(safe-area-inset-bottom, 0px));
+}
+
+/* --------------------------------------------------------------- motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .btn:active { transform: none; }
+}
+
+/* Narrow phones: keep the headline from crowding its block. */
+@media (max-width: 340px) {
+  .shell { padding: 0 8px; }
+  .level { padding: 14px 10px 12px; }
+  .slot { width: 42px; }
+}
