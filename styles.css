@@ -416,9 +416,16 @@ body {
   line-height: 1.1;
 }
 .slot__code { display: block; font-size: 10px; letter-spacing: 0.06em; }
-/* Current slot is marked by weight, not colour alone. */
+/* The marked slot is called out by border weight and a filled hour label, not
+   by colour alone — the swatch colour is already carrying the level. */
 .slot--now { border-width: 4px; border-color: var(--flame); }
 .slot--now .slot__hour { background: var(--flame); color: #fff; border-bottom-color: var(--flame); }
+
+/* BMKG drops slots once they are past, so for up to three hours a day nothing
+   covers the present moment. The nearest upcoming slot is marked differently
+   so it is never mistaken for a reading of right now. */
+.slot--next { border-width: 4px; border-style: dashed; border-color: var(--flame); }
+.slot--next .slot__hour { background: transparent; color: var(--flame); }
 
 /* ---------------------------------------------------------------- actions */
 .cumulative {

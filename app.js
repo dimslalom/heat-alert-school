@@ -811,21 +811,16 @@
     });
   }
 
-  function renderStrip(reading, dayKey, nowMs) {
+  function renderStrip(reading, dayKey, nowMs, mark) {
     var strip = $('hour-strip');
     clear(strip);
 
-    var slotMs = reading.intervalHours * 3600000;
     var todays = reading.entries.filter(function (e) { return e.dayKey === dayKey; });
-    var nowSlot = null;
-
-    todays.forEach(function (e) {
-      if (e.at <= nowMs && nowMs < e.at + slotMs) nowSlot = e;
-    });
 
     todays.forEach(function (e) {
       var lv = LEVELS[e.lv];
-      var cell = el('div', 'slot' + (e === nowSlot ? ' slot--now' : ''));
+      var isMark = mark && e === mark.entry;
+      var cell = el('div', 'slot' + (isMark ? (mark.isNow ? ' slot--now' : ' slot--next') : ''));
       cell.setAttribute('role', 'listitem');
       cell.appendChild(el('span', 'slot__hour', pad2(e.hour) + '.00'));
 
@@ -838,14 +833,15 @@
 
       cell.setAttribute('aria-label',
         pad2(e.hour) + ':00 — ' + lv.key + ' ' + lv.sub + ', ' + num(e.w, 1) + ' derajat sWBGT' +
-        (e === nowSlot ? ' (jam ini)' : ''));
+        (isMark ? (mark.isNow ? ' (jam ini)' : ' (perkiraan terdekat)') : ''));
       strip.appendChild(cell);
     });
 
-    if (nowSlot) {
-      // Put the current hour in view without animating for reduced-motion users.
-      var i = todays.indexOf(nowSlot);
-      strip.scrollLeft = Math.max(0, (i - 1) * 50);
+    if (mark && mark.entry) {
+      // Put the marked slot in view. Assignment rather than smooth scrolling,
+      // so there is nothing to suppress for prefers-reduced-motion.
+      var i = todays.indexOf(mark.entry);
+      if (i > -1) strip.scrollLeft = Math.max(0, (i - 1) * 50);
     }
 
     var note = reading.intervalHours === 3
@@ -876,6 +872,8 @@
       'ditampilkan. Jangan mengambil keputusan dari angka lama. Sambungkan ' +
       'internet lalu muat ulang.'));
 
+    $('now-label').textContent = 'JAM INI';
+    $('now-level-label').textContent = 'Tingkat jam ini';
     $('now-value').textContent = '—';
     $('now-temp').textContent = '—';
     $('now-rh').textContent = '—';
@@ -940,10 +938,15 @@
     var peak = null;
     scope.forEach(function (e) { if (!peak || e.w > peak.w) peak = e; });
 
-    // Current hour: the slot containing now, else the nearest upcoming one.
-    var current = null;
+    /* The secondary number is "this hour" ONLY if a slot actually covers this
+       instant. BMKG drops slots whose time has passed, so between the start of
+       the dropped slot and the start of the next one — up to three hours, every
+       day — nothing covers now. Presenting the next slot as "JAM INI" would put
+       a future forecast under a present-tense label, so the label changes with
+       the facts instead. */
+    var current = null, currentIsNow = false;
     reading.entries.forEach(function (e) {
-      if (e.at <= nowMs && nowMs < e.at + slotMs) current = e;
+      if (e.at <= nowMs && nowMs < e.at + slotMs) { current = e; currentIsNow = true; }
     });
     if (!current) {
       for (var i = 0; i < reading.entries.length; i++) {
@@ -963,7 +966,7 @@
     block.className = 'level' + (lv.key === 'PUTIH' ? ' level--needs-border' : '');
     applyLevelVars(block, lv);
 
-    $('peak-kicker').textContent = peak ? kicker : 'JAM INI';
+    $('peak-kicker').textContent = peak ? kicker : (currentIsNow ? 'JAM INI' : 'PERKIRAAN TERDEKAT');
     var iconBox = $('level-icon');
     iconBox.innerHTML = lv.icon; // static literal
     $('level-name').textContent = lv.key;
@@ -974,9 +977,15 @@
         (kicker === 'PUNCAK BESOK' ? ' besok' : '')
       : 'Nilai jam berjalan';
 
-    // Secondary: the current-hour value.
+    // Secondary: the current-hour value, labelled for what it actually is.
     if (current) {
       var clv = LEVELS[current.lv];
+      $('now-label').textContent = currentIsNow
+        ? 'JAM INI'
+        : 'PERKIRAAN TERDEKAT · ' + pad2(current.hour) + '.00';
+      $('now-level-label').textContent = currentIsNow
+        ? 'Tingkat jam ini'
+        : 'Tingkat pada jam tersebut';
       $('now-value').textContent = num(current.w, 1);
       $('now-temp').textContent = num(current.t, 0) + ' °C';
       $('now-rh').textContent = num(current.rh, 0) + ' %';
@@ -992,7 +1001,8 @@
     document.querySelector('#screen-reading .h-sub').textContent =
       (kicker === 'PUNCAK BESOK') ? 'PERKIRAAN BESOK' : 'PERKIRAAN HARI INI';
 
-    renderStrip(reading, scopeDay, nowMs);
+    renderStrip(reading, scopeDay, nowMs,
+      current ? { entry: current, isNow: currentIsNow } : null);
 
     // Actions follow the more severe of peak and current hour — the
     // conservative choice for a safety tool.
@@ -1137,7 +1147,8 @@
     // rather than a broken image: three concentric orange-to-red arcs, the
     // same lockup the icons use.
     var logo = $('logo');
-    logo.addEventListener('error', function () {
+    function logoFallback() {
+      if (!logo || !logo.parentNode) return;
       var ph = document.createElement('span');
       ph.className = 'lockup__mark';
       ph.setAttribute('aria-hidden', 'true');
@@ -1148,8 +1159,14 @@
         '<path d="M11.5 27a8.5 8.5 0 0 1 17 0" fill="none" stroke="#F04E23" stroke-width="4.4"/>' +
         '<path d="M17 27a3 3 0 0 1 6 0" fill="none" stroke="#F5921E" stroke-width="4.4"/>' +
         '<rect x="6" y="29" width="28" height="3.2" fill="#FDFBEA"/></svg>';
-      if (logo.parentNode) logo.parentNode.replaceChild(ph, logo);
-    });
+      logo.parentNode.replaceChild(ph, logo);
+    }
+    logo.addEventListener('error', logoFallback);
+    // The image request usually fails BEFORE this script runs, so the error
+    // event has already been and gone. A finished-but-zero-width image is the
+    // reliable signal that it failed; without this check the app shows a broken
+    // image icon whenever assets/logo.svg has not been supplied yet.
+    if (logo.complete && logo.naturalWidth === 0) logoFallback();
 
     window.addEventListener('beforeinstallprompt', function (e) {
       e.preventDefault();
